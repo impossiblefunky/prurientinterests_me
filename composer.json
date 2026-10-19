@@ -1,0 +1,20 @@
+{
+  "name": "impossiblefunky/prurientinterests",
+  "description": "prurientinterests.me site and CMS",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.3",
+    "ext-dom": "*",
+    "ext-gd": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "ext-xml": "*",
+    "ext-zip": "*"
+  },
+  "autoload": {
+    "psr-4": { "App\\": "src/" },
+    "files": ["src/Web/helpers.php"]
+  },
+  "config": { "optimize-autoloader": true, "sort-packages": true }
+}

@@ -1,0 +1,8 @@
+# Real files (CSS, JS, uploads, favicon) are served directly; everything else goes to the PHP front controller.
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.php [L]

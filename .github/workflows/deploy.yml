@@ -1,0 +1,43 @@
+# Deploys to DreamHost every time main is pushed (rsync over SSH, never FTP).
+# Secrets (repo > Settings > Secrets and variables > Actions): DH_SSH_PRIVATE_KEY, DH_HOST, DH_USER, DH_PATH.
+# DH_PATH is the project folder on the server; the domain's web directory must be DH_PATH/public.
+name: Deploy to DreamHost
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DH_SSH_PRIVATE_KEY }}
+      - name: Trust the DreamHost host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DH_HOST }}" >> ~/.ssh/known_hosts
+      - name: Sync files to the server
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' --exclude '.github/' --exclude 'docs/' \
+            --exclude '.env' --exclude 'vendor/' \
+            --exclude 'storage/logs/*' --exclude 'storage/cache/*' --exclude 'storage/sessions/*' \
+            --exclude 'storage/secrets/*' --exclude 'storage/import/*' \
+            --exclude 'public/uploads/' \
+            ./ "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}:${{ secrets.DH_PATH }}/"
+      - name: Install dependencies and run database migrations
+        run: |
+          ssh "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}" \
+            "cd '${{ secrets.DH_PATH }}' && \
+             mkdir -p storage/logs storage/cache storage/sessions public/uploads && \
+             \$HOME/bin/composer install --no-dev --optimize-autoloader --no-interaction && \
+             php bin/migrate.php && \
+             echo 'deployed at' \$(date -u +%Y-%m-%dT%H:%M:%SZ)"
