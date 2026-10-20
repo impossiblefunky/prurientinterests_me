@@ -16,3 +16,5 @@ Takeout/
 *.log
 .claude/
 !public/uploads/.htaccess
+storage/reports/*
+!storage/reports/.gitkeep

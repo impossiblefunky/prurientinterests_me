@@ -1,0 +1,2 @@
+# Corrections approved by Mike. One per line: wrong<TAB>right   (add a third column, a story slug, to limit it to one story)
+# Preview with:  php bin/apply-spelling.php      Apply with:  php bin/apply-spelling.php --write

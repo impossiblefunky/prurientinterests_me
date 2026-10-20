@@ -31,7 +31,7 @@ php bin/create-admin.php you@example.com "Your Name"
 Then sign in at https://prurientinterests.me/admin.
 
 ## 4. Bring the writing in
-Upload the Blogger `feed.atom` and the Word files to `storage/import/` on the server, then run these one at a time. `--dry-run` shows what would happen without changing anything.
+The Blogger posts are the master copy. Upload `feed.atom` (from the Takeout) to `storage/import/` on the server, then run these one at a time. `--dry-run` shows the counts without changing anything.
 
 ```bash
 php bin/import-blogger.php storage/import/feed.atom --dry-run
@@ -41,19 +41,35 @@ php bin/import-blogger.php storage/import/feed.atom --dry-run
 php bin/import-blogger.php storage/import/feed.atom
 ```
 
+## 4b. Spell check (nothing changes until you approve it)
+This makes a report at `storage/reports/spellcheck.md` listing possible misspellings, names to confirm and doubled words:
+
 ```bash
-php bin/import-docx.php storage/import/confessions.docx --split --dry-run
+php bin/spellcheck.php
+```
+
+Read it. Put corrections you agree with in `docs/spelling-fixes.tsv` (the word that is wrong, a Tab, the right word). Put words that are fine as written in `docs/custom-dictionary.txt`. Then preview, and apply:
+
+```bash
+php bin/apply-spelling.php
 ```
 
 ```bash
-php bin/import-docx.php storage/import/confessions.docx --split
+php bin/apply-spelling.php --write
+```
+
+Every changed story keeps its old text under **Earlier versions** in the CMS, so a mistake can be undone.
+
+## 4c. Compare with the Word files
+Your Word files might have been edited. This only reports differences, split into "spelling or punctuation" and "wording changed", and changes nothing:
+
+```bash
+php bin/compare-docx.php storage/import/confessions.docx --split
 ```
 
 ```bash
-php bin/import-docx.php storage/import/story.doc.docx --title "The title of the story"
+php bin/compare-docx.php storage/import/story.doc.docx --title "Exact story title"
 ```
-
-Always import Blogger first, so the spell-checked Word text can replace the matching Blogger posts.
 
 ## 5. Before launch
 Review every imported story in the admin, publish the ones that should go live, check the Tags list, and look at the sitemap at /sitemap.xml. Only then point DNS at DreamHost.

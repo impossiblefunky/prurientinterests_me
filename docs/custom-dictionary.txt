@@ -1,0 +1,2 @@
+# Words that are correct as written (names, slang, terms of the trade). One per line, any case. Lines starting with # are ignored.
+# Copied from the spelling report after Mike reviews it, so they stop being flagged.
