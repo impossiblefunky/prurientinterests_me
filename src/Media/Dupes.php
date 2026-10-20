@@ -14,7 +14,12 @@ final class Dupes
 
     public static function hash(string $relPath): ?string
     {
-        $path = Env::root() . '/public/uploads/' . $relPath;
+        return self::hashFile(Env::root() . '/public/uploads/' . $relPath);
+    }
+
+    /** Fingerprint of any image file on disk. */
+    public static function hashFile(string $path): ?string
+    {
         $info = is_file($path) ? @getimagesize($path) : false;
         if (!$info) {
             return null;
@@ -61,7 +66,7 @@ final class Dupes
         return (int) $pdo->query('SELECT COUNT(*) FROM gallery_items WHERE dhash IS NULL')->fetchColumn();
     }
 
-    private static function distance(string $a, string $b): int
+    public static function distance(string $a, string $b): int
     {
         $d = 0;
         for ($i = 0; $i < 16; $i += 8) {

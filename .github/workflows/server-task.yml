@@ -30,6 +30,8 @@ on:
           - make-series
           - publish-images
           - tidy-content
+          - apply-alt-text-preview
+          - apply-alt-text
           - add-amazon-books
           - import-images-dry-run
           - import-images
@@ -137,6 +139,10 @@ jobs:
               remote "\$PHP bin/add-amazon-books.php" ;;
             tidy-content)
               remote "\$PHP bin/tidy-content.php" ;;
+            apply-alt-text-preview)
+              remote "\$PHP bin/apply-alt-text.php --preview" ;;
+            apply-alt-text)
+              remote "\$PHP bin/apply-alt-text.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)
