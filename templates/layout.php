@@ -32,7 +32,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php if ($canon): ?><meta property="og:url" content="<?= e($canon) ?>">
 <?php endif; ?>
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="<?= e(asset('/assets/site.css')) ?>">
 <?php foreach ($jsonld as $j): ?><script type="application/ld+json"><?= json_encode($j, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
 <?php endforeach; ?>
 </head>
@@ -73,6 +73,6 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 </footer>
 <?php endif; ?>
 </div>
-<script src="/assets/site.js" defer></script>
+<script src="<?= e(asset('/assets/site.js')) ?>" defer></script>
 </body>
 </html>

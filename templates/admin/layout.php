@@ -6,7 +6,7 @@ $groups['Pages & homepage'][] = ['Settings', '/admin/settings'];
 $on = fn(string $u) => $here === $u || str_starts_with($here, $u . '/'); ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title><?= e($title) ?> | Admin</title>
-<link rel="stylesheet" href="/assets/site.css"><link rel="stylesheet" href="/assets/admin.css"></head>
+<link rel="stylesheet" href="<?= e(asset('/assets/site.css')) ?>"><link rel="stylesheet" href="<?= e(asset('/assets/admin.css')) ?>"></head>
 <body class="admin">
 <a class="skip" href="#main">Skip to main content</a>
 <header class="site-header"><a class="brand" href="/admin"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag">Admin</span></a>
@@ -26,5 +26,5 @@ $on = fn(string $u) => $here === $u || str_starts_with($here, $u . '/'); ?><!doc
 <h1><?= e($title) ?></h1>
 <?= $body ?>
 </main></div>
-<script src="/assets/admin.js" defer></script>
+<script src="<?= e(asset('/assets/admin.js')) ?>" defer></script>
 </body></html>

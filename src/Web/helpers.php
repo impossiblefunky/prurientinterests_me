@@ -168,3 +168,10 @@ function search_mark(string $text, array $terms): string
     }
     return $out;
 }
+
+/** Address of a file under public/ with its change time added, so browsers fetch it again whenever it changes. */
+function asset(string $path): string
+{
+    $file = dirname(__DIR__, 2) . '/public' . $path;
+    return $path . (is_file($file) ? '?v=' . filemtime($file) : '');
+}
