@@ -94,7 +94,8 @@ input::placeholder{color:var(--muted)}
 .boxes{row-gap:1rem;margin-bottom:1.5rem}
 .boxes>*{grid-column:span 3}
 .boxes a{display:flex;align-items:center;min-height:44px;padding:.5rem 1rem;border:1px solid var(--line);color:var(--rose);text-decoration:none;font:.95rem var(--sans)}
-.pager ul{display:flex;gap:1rem;align-items:center;margin-top:2rem;font:.95rem var(--sans)}
+.pager{margin-top:2rem}
+.pager ul{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font:.95rem var(--sans)}
 .chapters li{padding:1rem 0;border-bottom:1px solid var(--line)}
 
 /* Hero */
@@ -215,3 +216,12 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .site-header nav a,.site-footer a,.interest-links a,.chip,.pager a,.crumbs a{min-width:44px;justify-content:center}
 .radios label{padding-right:.5rem;min-width:44px}
 .radios input{margin:0 .25rem 0 0}
+
+/* Numbered pager */
+.pager .btn.here{background:var(--wine);color:var(--wine-ink);border-color:var(--wine)}
+.pager .btn.off{opacity:.45;cursor:default}
+.pager .gap{min-width:1.5rem;text-align:center;color:var(--muted)}
+.pager .meta{margin:.75rem 0 0}
+.pager-jump{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.5rem;font:.95rem var(--sans)}
+.pager-jump input{width:5.5rem}
+.pager .btn{gap:.35rem}

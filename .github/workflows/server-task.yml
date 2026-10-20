@@ -29,6 +29,7 @@ on:
           - make-series-preview
           - make-series
           - publish-images
+          - tidy-content
           - add-amazon-books
           - import-images-dry-run
           - import-images
@@ -134,6 +135,8 @@ jobs:
               remote "\$PHP bin/make-series.php --preview" ;;
             add-amazon-books)
               remote "\$PHP bin/add-amazon-books.php" ;;
+            tidy-content)
+              remote "\$PHP bin/tidy-content.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)

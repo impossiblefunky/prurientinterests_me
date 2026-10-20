@@ -23,6 +23,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <meta name="rating" content="adult">
 <?php if ($robots): ?><meta name="robots" content="<?= e($robots) ?>">
 <?php endif; ?>
+<link rel="alternate" type="application/atom+xml" title="<?= e(setting('site_title')) ?>" href="/feed">
 <?php if ($canon): ?><link rel="canonical" href="<?= e($canon) ?>">
 <?php endif; ?>
 <meta property="og:site_name" content="<?= e(setting('site_title')) ?>">

@@ -34,6 +34,8 @@ final class Site
         $r->get('/books', fn() => $this->books());
         $r->get('/about', fn() => $this->page(['about', 'about-prurient-interests']));
         $r->get('/p/{file}', fn(array $p) => $this->legacyPage('/p/' . $p['file']));
+        $r->get('/feed', fn() => $this->feed());
+        $r->get('/feeds/posts/default', fn() => $this->feed());   // the address old Blogger readers already subscribe to
         $r->get('/robots.txt', fn() => $this->robots());
         $r->get('/sitemap.xml', fn() => $this->sitemap());
         $r->post('/enter', fn() => $this->enter());
@@ -508,6 +510,30 @@ final class Site
     }
 
     // ---- machine-readable ---------------------------------------------------------------------------------
+
+    /** Atom feed of the newest 50 stories and posts (not the image-only posts), for people who follow the site in a reader. */
+    private function feed(): void
+    {
+        $pdo = Db::pdo();
+        $rows = $pdo->query('SELECT s.slug, s.legacy_path, s.title, s.summary, s.body_html, s.author, s.published_at, s.updated_at FROM stories s WHERE ' . self::LIVE . ' AND s.kind <> "picture" ORDER BY s.published_at DESC LIMIT 50')->fetchAll();
+        $iso = fn(?string $t) => gmdate('c', strtotime(($t ?: 'now') . ' UTC'));
+        $x = fn(string $v) => htmlspecialchars($v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $name = setting('author_name', setting('site_title'));
+        header('Content-Type: application/atom+xml; charset=utf-8');
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<feed xmlns="http://www.w3.org/2005/Atom">' . "\n";
+        echo '<title>' . $x(setting('site_title')) . '</title><subtitle>' . $x(setting('tagline')) . '</subtitle>';
+        echo '<link href="' . $x(site_url('/feed')) . '" rel="self" type="application/atom+xml"/><link href="' . $x(site_url('/')) . '"/>';
+        echo '<id>' . $x(site_url('/')) . '</id><updated>' . $iso($rows[0]['updated_at'] ?? null) . '</updated>';
+        foreach ($rows as $s) {
+            $url = site_url(story_url($s));
+            $sum = $s['summary'] !== '' ? $s['summary'] : excerpt($s['body_html'], 300);
+            echo '<entry><title>' . $x($s['title']) . '</title><link href="' . $x($url) . '"/><id>' . $x($url) . '</id>';
+            echo '<published>' . $iso($s['published_at']) . '</published><updated>' . $iso($s['updated_at']) . '</updated>';
+            echo '<author><name>' . $x($s['author'] !== '' ? $s['author'] : $name) . '</name></author><summary>' . $x($sum) . '</summary></entry>' . "\n";
+        }
+        echo '</feed>';
+    }
 
     private function robots(): void
     {

@@ -1,0 +1,39 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * One-time tidy-up approved by Mike (2026-10-20). Safe to run again.
+ *  - Contact page: the "pornoperson at gmail dot com" line becomes a real mailto link.
+ *  - Tags: proper capitalisation (eLust, FetLife, CineKink) and "BDSM terms" merged into "Terminology",
+ *    which is renamed "BDSM terminology". Old tag addresses keep working (alias redirect).
+ */
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+use App\Support\Db;
+
+$pdo = Db::pdo();
+
+$n = $pdo->prepare("UPDATE pages SET body_html = REPLACE(body_html, 'Email me at pornoperson at gmail dot com', 'Email me at <a href=\"mailto:pornoperson@gmail.com\">pornoperson@gmail.com</a>'), updated_at = UTC_TIMESTAMP() WHERE slug = 'contact' AND body_html LIKE '%pornoperson at gmail dot com%'");
+$n->execute();
+echo "Contact page updated: " . $n->rowCount() . "\n";
+
+$rename = $pdo->prepare('UPDATE tags SET name = ? WHERE slug = ? AND BINARY name <> ?');
+foreach (['elust' => 'eLust', 'fetlife' => 'FetLife', 'cinekink' => 'CineKink'] as $slug => $name) {
+    $rename->execute([$name, $slug, $name]);
+    echo "Tag $slug -> $name: " . $rename->rowCount() . "\n";
+}
+
+$id = fn(string $slug) => (int) $pdo->query('SELECT id FROM tags WHERE slug = ' . $pdo->quote($slug))->fetchColumn();
+$from = $id('bdsm-terms');
+$to = $id('terminology');
+if ($from && $to) {
+    $pdo->prepare('INSERT IGNORE INTO item_tags (tag_id, item_type, item_id) SELECT ?, item_type, item_id FROM item_tags WHERE tag_id = ?')->execute([$to, $from]);
+    $pdo->prepare('DELETE FROM item_tags WHERE tag_id = ?')->execute([$from]);
+    $pdo->prepare('INSERT IGNORE INTO tag_aliases (alias_slug, tag_id) VALUES (?, ?)')->execute(['bdsm-terms', $to]);
+    $pdo->prepare('DELETE FROM tags WHERE id = ?')->execute([$from]);
+    echo "Merged 'BDSM terms' into Terminology.\n";
+}
+if ($to) {
+    $pdo->prepare("UPDATE tags SET name = 'BDSM terminology' WHERE id = ? AND name <> 'BDSM terminology'")->execute([$to]);
+}
+echo "Done.\n";
