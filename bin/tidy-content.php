@@ -140,8 +140,8 @@ echo "Old blogspot links moved to this site: $moved\n";
 // The automatic dead-link cleanup unwrapped the Lush Stories profile link on the Contact page (that site answers robots with a 404).
 // Put the link back, and say what the page now reads so it can be checked.
 $c = $pdo->query("SELECT id, body_html FROM pages WHERE slug = 'contact'")->fetch();
-if ($c && stripos($c['body_html'], 'lushstories.com/pornoperson') === false && preg_match('#(?<![>\w])My profile page#', $c['body_html'])) {
-    $b = preg_replace('#(?<![>\w])My profile page#', '<a href="http://www.lushstories.com/pornoperson">My profile page</a>', $c['body_html'], 1);
+if ($c && stripos($c['body_html'], 'lushstories.com/pornoperson') === false && strpos($c['body_html'], 'My profile page') !== false) {
+    $b = preg_replace('#My profile page#','<a href="http://www.lushstories.com/pornoperson">My profile page</a>', $c['body_html'], 1);
     $pdo->prepare('UPDATE pages SET body_html = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$b, $c['id']]);
     echo "Lush Stories link restored on the Contact page.\n";
 }
