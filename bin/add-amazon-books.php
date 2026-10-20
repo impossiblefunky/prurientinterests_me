@@ -43,6 +43,13 @@ foreach ($kindle as $slug => $url) {
     }
     $has->execute([$id, $url]);
     if (!$has->fetchColumn()) {
+        // the old Blogger "eBook" button already points at the Amazon Kindle book: update it rather than list it twice
+        $swap = $pdo->prepare("UPDATE book_editions SET name = 'Kindle Edition', purchase_url = ? WHERE book_id = ? AND name = 'eBook' AND purchase_url LIKE '%amazon.com%'");
+        $swap->execute([$url, $id]);
+        if ($swap->rowCount()) {
+            $linked++;
+            continue;
+        }
         $next->execute([$id]);
         $put->execute([$id, $url, (int) $next->fetchColumn()]);
         $linked++;
