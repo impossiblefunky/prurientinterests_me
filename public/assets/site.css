@@ -1,5 +1,6 @@
 /* Prurient Interests: "after dark" skin from the approved designs. System fonts only (nothing loads from outside). */
 :root{
+  --gutter:2rem;
   --bg:#0f0d10;--panel:#1d151d;--panel2:#171218;--text:#f3eae3;--muted:#beb2c0;--rose:#e0a6c2;--line:#5b4d55;--line-soft:#3a2f37;
   --wine:#782039;--wine-ink:#fbeef0;--focus:#ffd166;--max:82rem;--read:40.5rem;
   --serif:Georgia,"Times New Roman","DejaVu Serif",serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,"DejaVu Sans",sans-serif;
@@ -16,7 +17,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .nowrap{white-space:nowrap}
 [hidden]{display:none!important}
-main{max-width:var(--max);margin:0 auto;padding:2.5rem 1.5rem 4rem}
+main{max-width:var(--max);margin:0 auto;padding:2.5rem 1.5rem 4rem;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:var(--gutter);align-content:start}
+main>*{grid-column:1/-1;min-width:0}
 h1,h2,h3{font-family:var(--serif);font-weight:400;line-height:1.12;margin:0 0 1rem;color:var(--text)}
 h1{font-size:clamp(2.5rem,6vw,4.4rem);margin-top:.25rem}
 h2{font-size:clamp(1.7rem,3vw,2.2rem)}
@@ -75,7 +77,9 @@ input::placeholder{color:var(--muted)}
 .panel{background:var(--panel);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:center;padding:2rem;margin:2rem 0}
 .panel h2{margin:.25rem 0 .75rem}
 .panel .lead{margin:0}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:2rem 2.5rem}
+.grid,.cols,.boxes,.gallery,.hero{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:var(--gutter)}
+.grid{row-gap:2rem}
+.grid>*{grid-column:span 4}
 .entry{border-bottom:1px solid var(--line);padding-bottom:1.25rem}
 .entry h3{margin:.25rem 0 .75rem}
 .entry h3 a{color:var(--text);text-decoration:none}
@@ -83,16 +87,20 @@ input::placeholder{color:var(--muted)}
 .entry .summary{color:var(--muted)}
 .interest-links{font:.95rem var(--sans);display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 .interest-links a{display:inline-flex;align-items:center;min-height:44px}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:2rem}
+.cols{row-gap:2rem}
+.cols>*{grid-column:span 3}
 .cols h3{font-size:1.6rem}
 .taglist li{margin:.9rem 0;font-size:1.2rem}
-.boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;margin-bottom:1.5rem}
+.boxes{row-gap:1rem;margin-bottom:1.5rem}
+.boxes>*{grid-column:span 3}
 .boxes a{display:flex;align-items:center;min-height:44px;padding:.5rem 1rem;border:1px solid var(--line);color:var(--rose);text-decoration:none;font:.95rem var(--sans)}
 .pager ul{display:flex;gap:1rem;align-items:center;margin-top:2rem;font:.95rem var(--sans)}
 .chapters li{padding:1rem 0;border-bottom:1px solid var(--line)}
 
 /* Hero */
-.hero{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:3rem;align-items:center;padding:2rem 0 3rem}
+.hero{align-items:center;padding:2rem 0 3rem}
+.hero-text{grid-column:1 / span 7}
+.hero-book{grid-column:9 / span 4}
 .hero h1{font-size:clamp(3rem,8vw,5.5rem)}
 .hero-book{justify-self:center;text-align:center;transform:rotate(3deg)}
 .cover{display:block;width:200px;height:auto}
@@ -102,7 +110,9 @@ input::placeholder{color:var(--muted)}
 .hero-book .cover.placeholder{width:min(260px,70vw)}
 
 /* Reading */
-.reading{max-width:var(--read);margin:0 auto}
+.reading{grid-column:3 / span 8}
+.reading>*{max-width:var(--read);margin-left:auto;margin-right:auto}
+.reading .prose{max-width:var(--read)}
 .reading h1{font-size:clamp(2.2rem,5vw,3.4rem)}
 .reading-tools{border-bottom:1px solid var(--line);margin-bottom:1.5rem;padding-bottom:.25rem}
 .prose{font-size:1.2rem;line-height:1.9}
@@ -118,14 +128,16 @@ input::placeholder{color:var(--muted)}
 /* Books */
 .book{display:flex;flex-wrap:wrap;gap:2rem;border-top:1px solid var(--line);padding:2rem 0;margin-top:1rem}
 .book>div:not(.cover){flex:1 1 20rem;max-width:46rem}
-.book>.cover{flex:none}
+.book>.cover{flex:none;align-self:flex-start;height:auto}
+.book>img.cover{width:200px;max-width:40vw}
 .editions li{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;margin:.75rem 0;font:1rem var(--sans)}
 .excerpt{margin:1rem 0}
 .excerpt summary{display:inline-flex;list-style:none}
 .excerpt[open] summary{margin-bottom:1rem}
 
 /* Gallery */
-.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:1.25rem}
+.gallery{row-gap:1.25rem;column-gap:1.25rem}
+.gallery>*{grid-column:span 3}
 .gallery img{width:100%;height:auto;display:block;background:var(--panel)}
 .shot{margin:0}
 .shot figcaption{font:.875rem/1.5 var(--sans);color:var(--muted);padding-top:.5rem}
@@ -139,8 +151,21 @@ body.bare main{display:grid;place-items:center;min-height:100vh;padding:1.5rem}
 .gate .lead{margin:0 auto 2rem}
 .gate .actions{justify-content:center}
 
+@media (max-width:64rem){
+  :root{--gutter:1.5rem}
+  .gallery{column-gap:var(--gutter)}
+  .grid>*{grid-column:span 6}
+  .cols>*{grid-column:span 4}
+  .boxes>*,.gallery>*{grid-column:span 4}
+  .reading{grid-column:1/-1}
+}
+@media (max-width:40rem){
+  :root{--gutter:.5rem}
+  .grid>*,.cols>*{grid-column:1/-1}
+  .boxes>*,.gallery>*{grid-column:span 6}
+}
 @media (max-width:48rem){
-  .hero{grid-template-columns:1fr}
+  .hero-text,.hero-book{grid-column:1/-1}
   .hero-book{transform:none}
   .site-footer ul{justify-content:flex-start}
   main{padding:1.5rem 1rem 3rem}
@@ -181,3 +206,12 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .viewer-prev,.viewer-next{min-width:44px;min-height:44px;font-size:1.4rem}
 @media (max-width:40rem){.viewer-stage{flex-wrap:wrap;align-content:center}.viewer figure{order:-1;flex-basis:100%;height:auto}.viewer img{max-height:calc(100vh - 14rem)}}
 @media (prefers-reduced-motion:no-preference){.viewer[open]{animation:vfade .15s ease-out}@keyframes vfade{from{opacity:0}to{opacity:1}}}
+
+/* Long words, wide tables and embedded media never push the page sideways */
+.prose{overflow-wrap:anywhere}
+.prose table{display:block;max-width:100%;overflow-x:auto}
+.prose iframe,.prose video,.prose embed,.prose object{max-width:100%}
+/* Every link and control is at least 44px wide as well as tall */
+.site-header nav a,.site-footer a,.interest-links a,.chip,.pager a,.crumbs a{min-width:44px;justify-content:center}
+.radios label{padding-right:.5rem;min-width:44px}
+.radios input{margin:0 .25rem 0 0}

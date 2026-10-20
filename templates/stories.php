@@ -12,7 +12,7 @@ $qs = fn(array $o) => '?' . http_build_query(array_filter(['q' => $q, 'sort' => 
 </form>
 <?php endif; ?>
 <p role="status"><?= $total ?> <?= $total === 1 ? 'story' : 'stories' ?><?= $q !== '' ? ' matching “' . e($q) . '”' : '' ?></p>
-<div class="grid"><?php foreach ($stories as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>
+<h2 class="sr-only">All stories</h2><div class="grid"><?php foreach ($stories as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>
 <?php if ($pages > 1): ?>
 <nav class="pager" aria-label="Pages"><ul>
   <?php if ($page > 1): ?><li><a rel="prev" href="<?= e($base . $qs(['page' => $page - 1])) ?>">&larr; Newer</a></li><?php endif; ?>

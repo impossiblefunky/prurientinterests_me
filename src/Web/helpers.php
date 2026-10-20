@@ -101,6 +101,13 @@ function qs(array $cur, array $over = []): string
 /** Story text for display: outside links open in a new tab and say so to screen readers. */
 function prose(string $html): string
 {
+    // A link that holds only a picture with no description still needs a name for screen readers.
+    $html = preg_replace_callback('#<a ([^>]*)>(\s*<img\b[^>]*>\s*)</a>#is', function (array $m): string {
+        if (preg_match('#\balt="[^"]+"#i', $m[2]) || stripos($m[1], 'aria-label') !== false) {
+            return $m[0];
+        }
+        return '<a ' . $m[1] . ' aria-label="View picture">' . $m[2] . '</a>';
+    }, $html) ?? $html;
     return preg_replace_callback('#<a href="(https?://[^"]+)"(?: rel="noopener")?>(.*?)</a>#is', function (array $m): string {
         $host = parse_url($m[1], PHP_URL_HOST);
         $mine = parse_url((string) \App\Support\Env::get('APP_URL', ''), PHP_URL_HOST);

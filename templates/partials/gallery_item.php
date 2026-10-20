@@ -1,6 +1,6 @@
 <?php /** @var array $g */ ?>
 <li><figure class="shot">
-  <a href="/uploads/<?= e($g['file']) ?>"><img src="/uploads/<?= e($g['thumb'] !== '' ? $g['thumb'] : $g['file']) ?>" alt="<?= e($g['alt_text'] !== '' && $g['alt_text'] === $g['caption'] ? '' : $g['alt_text']) ?>" loading="lazy"<?= $g['width'] ? ' width="' . (int) $g['width'] . '" height="' . (int) $g['height'] . '"' : '' ?>></a>
+  <a href="/uploads/<?= e($g['file']) ?>" aria-label="View larger: <?= e($g['caption'] !== '' ? $g['caption'] : ($g['title'] !== '' ? $g['title'] : 'picture')) ?>"><img src="/uploads/<?= e($g['thumb'] !== '' ? $g['thumb'] : $g['file']) ?>" alt="<?= e($g['alt_text'] !== '' && $g['alt_text'] === $g['caption'] ? '' : $g['alt_text']) ?>" loading="lazy"<?= $g['width'] ? ' width="' . (int) $g['width'] . '" height="' . (int) $g['height'] . '"' : '' ?>></a>
   <?php if ($g['caption'] !== '' || $g['credit'] !== '' || $g['source_url'] !== ''): ?><figcaption>
     <?= e($g['caption']) ?>
     <?php if ($g['credit'] !== '' || $g['source_url'] !== ''): ?><span class="credit"><?php

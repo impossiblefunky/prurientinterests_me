@@ -18,6 +18,6 @@
   <?php endforeach; ?>
 </ul></nav>
 <p class="meta" role="status"><?= number_format($total) ?> <?= $total === 1 ? 'entry' : 'entries' ?><?= $q !== '' ? ' matching “' . e($q) . '”' : '' ?></p>
-<?php if ($rows): ?><div class="grid"><?php foreach ($rows as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>
+<?php if ($rows): ?><h2 class="sr-only">Stories</h2><div class="grid"><?php foreach ($rows as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>
 <?php else: ?><p>Nothing matches. Try fewer filters.</p><?php endif; ?>
 <?php include __DIR__ . '/partials/pager.php'; ?>

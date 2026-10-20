@@ -314,6 +314,9 @@ final class Site
         $cm->execute([$s['id']]);
         $comments = $cm->fetchAll();
         $desc = $s['summary'] !== '' ? $s['summary'] : excerpt($s['body_html']);
+        if ($desc === '') {
+            $desc = $s['title'] . ' · a post from ' . setting('site_title') . ', ' . format_date($s['published_at']) . '.';
+        }
         $url = site_url(story_url($s));
         $author = $s['author'] !== '' ? $s['author'] : setting('author_name', setting('site_title'));
         $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author, 'comments' => $comments], [
@@ -324,7 +327,7 @@ final class Site
             'breadcrumbs' => [['Stories', '/stories'], [$s['title'], story_url($s)]],
             'jsonld' => [['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => $s['title'], 'description' => $desc,
                 'datePublished' => gmdate('c', strtotime($s['published_at'] . ' UTC')), 'dateModified' => gmdate('c', strtotime($s['updated_at'] . ' UTC')),
-                'author' => ['@type' => 'Person', 'name' => $author], 'mainEntityOfPage' => $url, 'wordCount' => (int) $s['word_count'],
+                'author' => ['@type' => 'Person', 'name' => $author], 'publisher' => ['@type' => 'Person', 'name' => $author], 'inLanguage' => 'en', 'isFamilyFriendly' => false, 'mainEntityOfPage' => $url, 'wordCount' => (int) $s['word_count'],
                 'isAccessibleForFree' => true, 'keywords' => implode(', ', array_column($tags, 'name'))]],
         ]);
     }
