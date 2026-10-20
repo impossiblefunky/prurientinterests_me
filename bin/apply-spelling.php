@@ -2,11 +2,11 @@
 declare(strict_types=1);
 
 /**
- * Applies the corrections YOU approved in docs/spelling-fixes.tsv. Shows what it would do unless you add --write.
+ * Applies the corrections YOU approved in config/spelling-fixes.tsv. Shows what it would do unless you add --write.
  *   php bin/apply-spelling.php            preview only
  *   php bin/apply-spelling.php --write    make the changes (each changed story keeps its old text as an earlier version)
  *
- * docs/spelling-fixes.tsv: one fix per line, columns separated by a TAB:
+ * config/spelling-fixes.tsv: one fix per line, columns separated by a TAB:
  *   wrong<TAB>right                    fixes the whole word everywhere (case must match)
  *   wrong<TAB>right<TAB>story-slug     fixes it in that story only
  * Lines starting with # are ignored. Only visible text is touched, never HTML tags, links or image addresses.
@@ -18,9 +18,9 @@ use App\Support\Db;
 use App\Support\Env;
 
 $write = in_array('--write', $argv, true);
-$file = Env::root() . '/docs/spelling-fixes.tsv';
+$file = Env::root() . '/config/spelling-fixes.tsv';
 if (!is_readable($file)) {
-    fwrite(STDERR, "Create docs/spelling-fixes.tsv first (see the comment at the top of this script).\n");
+    fwrite(STDERR, "Create config/spelling-fixes.tsv first (see the comment at the top of this script).\n");
     exit(1);
 }
 $fixes = [];

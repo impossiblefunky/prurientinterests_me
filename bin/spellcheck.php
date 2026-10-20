@@ -8,8 +8,8 @@ declare(strict_types=1);
  *   php bin/spellcheck.php --wordlist=/path/to/words
  * Writes storage/reports/spellcheck.md (read it) and storage/reports/spellcheck.json.
  *
- * Review the report, then put the corrections you approve in docs/spelling-fixes.tsv and run bin/apply-spelling.php.
- * Words that are correct for your writing (names, slang, brand names) go in docs/custom-dictionary.txt, one per line,
+ * Review the report, then put the corrections you approve in config/spelling-fixes.tsv and run bin/apply-spelling.php.
+ * Words that are correct for your writing (names, slang, brand names) go in config/custom-dictionary.txt, one per line,
  * and stop being reported next time.
  */
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -23,7 +23,7 @@ foreach (array_slice($argv, 1) as $a) {
     if (preg_match('/^--([a-z]+)=(.*)$/', $a, $m)) { $opt[$m[1]] = $m[2]; }
 }
 $root = Env::root();
-$sp = new Spelling([$opt['wordlist']], $root . '/docs/custom-dictionary.txt');
+$sp = new Spelling([$opt['wordlist']], $root . '/config/custom-dictionary.txt');
 
 $sql = 'SELECT id, title, slug, status, body_html FROM stories' . ($opt['status'] !== '' ? ' WHERE status = ' . Db::pdo()->quote($opt['status']) : '') . ' ORDER BY id';
 $unknown = [];   // lower => ['forms'=>[], 'count'=>n, 'stories'=>[id=>title], 'ctx'=>[]]
@@ -65,8 +65,8 @@ usort($typos, fn($a, $b) => $b['count'] <=> $a['count']);
 usort($names, fn($a, $b) => $b['count'] <=> $a['count']);
 
 $md = "# Spelling report\n\nChecked $storyCount stories, " . number_format($totalWords) . " words. Nothing has been changed.\n\n"
-    . "How to use this: copy the corrections you agree with into `docs/spelling-fixes.tsv` (wrong, a tab, then right). "
-    . "Add words that are fine as written to `docs/custom-dictionary.txt`.\n\n"
+    . "How to use this: copy the corrections you agree with into `config/spelling-fixes.tsv` (wrong, a tab, then right). "
+    . "Add words that are fine as written to `config/custom-dictionary.txt`.\n\n"
     . "## Possible misspellings (" . count($typos) . ")\n\n| Word | Times | Aspell suggests | Where it appears |\n|---|---|---|---|\n";
 $cell = fn(string $s) => str_replace(['|', "\n"], ['\\|', ' '], $s);
 foreach ($typos as $r) {
