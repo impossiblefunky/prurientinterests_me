@@ -28,4 +28,24 @@ foreach ($titles as $i => $t) {
     $ed->execute([(int) $pdo->lastInsertId(), AUTHOR_PAGE]);
     $added++;
 }
-echo "$added books added.\n";
+
+// Kindle links Mike supplied for the two books that already exist (kept exactly as given).
+$kindle = ['freedom-is-slavery' => 'https://amzn.to/4eHrV3P', 'life-on-my-knees' => 'https://amzn.to/4enhSRn'];
+$has = $pdo->prepare('SELECT 1 FROM book_editions WHERE book_id = ? AND purchase_url = ?');
+$next = $pdo->prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM book_editions WHERE book_id = ?');
+$put = $pdo->prepare("INSERT INTO book_editions (book_id, name, purchase_url, sort_order) VALUES (?, 'Kindle Edition', ?, ?)");
+$linked = 0;
+foreach ($kindle as $slug => $url) {
+    $find->execute([$slug]);
+    $id = (int) $find->fetchColumn();
+    if (!$id) {
+        continue;
+    }
+    $has->execute([$id, $url]);
+    if (!$has->fetchColumn()) {
+        $next->execute([$id]);
+        $put->execute([$id, $url, (int) $next->fetchColumn()]);
+        $linked++;
+    }
+}
+echo "$added books added, $linked Kindle links added.\n";
