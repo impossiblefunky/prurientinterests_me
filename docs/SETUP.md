@@ -2,7 +2,7 @@
 
 Words used below. **Repo**: the project's folder on GitHub. **Secret**: a private value stored in GitHub, never in the code. **Workflow**: a button on GitHub's Actions tab that does a job for you. **Migration**: a numbered file that builds the database tables.
 
-Facts for this site: DreamHost user `cashiers`, server `pdx1-shared-a1-04.dreamhost.com`, project folder `/home/cashiers/prurientinterests.me`, website address `https://prurientinterests.me`. The old blog is at pornoperson.blogspot.com and is not touched until the very end.
+Status (2026-10-20): the site is deployed, the database exists, the admin login is created, and the Blogger import is run from the Server task buttons. Facts for this site: DreamHost user `cashiers`, server `pdx1-shared-a1-04.dreamhost.com`, project folder `/home/cashiers/prurientinterests.me`, website address `https://prurientinterests.me`. The old blog is at pornoperson.blogspot.com and is not touched until the very end.
 
 ## 1. DreamHost: add the website
 Websites > Manage Websites > Add Website > Fully Hosted. Domain `prurientinterests.me`, user `cashiers`, web directory `prurientinterests.me/public`, PHP 8.3, free Let's Encrypt certificate, remove "www".
@@ -29,13 +29,20 @@ Push to `main`, or Actions > **Deploy to DreamHost** > Run workflow.
 
 ## 6. Server tasks (buttons, not commands)
 Actions > **Server task** > Run workflow > choose a task. In this order:
+0. Real settings used here: web directory `prurientinterests.me/public`, PHP 8.3, command-line PHP 8.3 is chosen automatically (the server's plain `php` is older), database login `prurientdb` (own login, only the `prurient` database).
 1. `check` (proves GitHub can log in)
 2. `write-env` (writes the private settings file on the server from your secrets)
 3. Run **Deploy** again so the database tables are built (or run `migrate`)
 4. `create-admin` (first add a GitHub secret `ADMIN_PASSWORD` of 12 or more characters, fill in your email and name, run it, then delete that secret)
 
 ## 7. Bring the writing in
-Upload `feed.atom` and the Takeout zip (rename it `takeout.zip`) into `storage/import/` on the server with DreamHost's File Manager (or any SFTP program). Then run, one at a time, from Server task: `import-blogger-dry-run`, `import-blogger`, `import-images-dry-run`, `import-images`, `spellcheck`, `apply-spelling-preview`, `apply-spelling`. Reports (`spellcheck`, image reports) appear as downloadable files at the bottom of the run's page.
+Upload the Takeout zip (the big file) as `storage/import/takeout.zip` with this PowerShell command (it uses your deploy key; adjust the first path if the file is elsewhere), then run the Server task `unpack-takeout`, which pulls `feed.atom` out of it:
+
+```powershell
+scp -i "$HOME\.ssh\prurient_deploy" "C:\Users\mwhit\Dropbox\websites\Prurientinterests\takeout-20261019T211304Z-1-001.zip" cashiers@pdx1-shared-a1-04.dreamhost.com:/home/cashiers/prurientinterests.me/storage/import/takeout.zip
+```
+
+Then run, one at a time, from Server task: `import-blogger-dry-run`, `import-blogger`, `import-images-dry-run`, `import-images`, `spellcheck`, `apply-spelling-preview`, `apply-spelling`. Reports (`spellcheck`, image reports) appear as downloadable files at the bottom of the run's page.
 
 Every changed story keeps its old text under **Earlier versions** in the CMS. Imported gallery images are drafts until you publish them.
 
