@@ -28,8 +28,8 @@ Public site + small CMS for Mike White's adult writing site, replacing the Blogg
 
 ## Open items
 - Done: designs and Takeout downloaded; Blogger import verified against a local test database; spell check and Word comparison run. Next: Mike's decisions on picture/video posts and on the proposed spelling fixes; then restyle to the designs and build series, albums, editions, tag pages.
-- Self-host images: copy from the Takeout Albums into `public/uploads/` and rewrite post image URLs (needs the Takeout on the machine that runs the import).
-- Apply the Claude Design handoff (typography, colors, layouts) to `public/assets/site.css` and `templates/`.
+- Images: `bin/import-images.php takeout.zip` self-hosts post images (1,116 matched of ~1,207; ~53 are third-party hotlinks or not in the Takeout), rewrites posts, and creates DRAFT gallery items (~1,095) in DRAFT albums by year with credits parsed from `_by_Name` file names. Mike must review/publish them. Never copy a Takeout file by its name; everything is re-encoded by `Images::store` (extension from content).
+- DONE: public site and CMS styled to the designs (screenshots compared). Still to do: mobile pass at 320px with axe, a real cover image for books, a contact form or contact method, a /feed for old Blogger feed readers, and alt text for the ~1,095 draft gallery items.
 - Run the Blogger import and report: counts, external images (download and self-host), comments (stored privately in `comments_archive`, not shown).
 - Decide the site `author` name shown in schema and cards; confirm tag names after import.
 - Add the other admin screens' polish from the CMS designs (page manager, tag merge).

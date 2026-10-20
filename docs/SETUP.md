@@ -41,6 +41,19 @@ php bin/import-blogger.php storage/import/feed.atom --dry-run
 php bin/import-blogger.php storage/import/feed.atom
 ```
 
+## 4a. Bring the pictures over
+Blogger's pictures live on Google's servers. This copies them onto your own server, so they keep working. Upload the Takeout `.zip` (the big file) to `storage/import/` on the server, then:
+
+```bash
+php bin/import-images.php storage/import/takeout-20261019T211304Z-1-001.zip --dry-run
+```
+
+```bash
+php bin/import-images.php storage/import/takeout-20261019T211304Z-1-001.zip
+```
+
+Every image is checked to be a real picture and re-saved (this also removes hidden location data), and the post text is switched to the new copy. Each picture post's images also appear in the CMS under **Images** as **drafts** in draft albums named by year ("Pictures 2009"), with the creator credit filled in when the file name says "_by_Name". Nothing goes public until you publish it. The list of pictures that were not in the Takeout (hosted on other websites) is saved to `storage/reports/images-not-found.txt`.
+
 ## 4b. Spell check (nothing changes until you approve it)
 This makes a report at `storage/reports/spellcheck.md` listing possible misspellings, names to confirm and doubled words:
 
