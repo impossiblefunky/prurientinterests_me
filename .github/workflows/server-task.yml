@@ -17,6 +17,7 @@ on:
           - write-env
           - migrate
           - create-admin
+          - unpack-takeout
           - import-blogger-dry-run
           - import-blogger
           - import-images-dry-run
@@ -105,6 +106,8 @@ jobs:
               [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] || { echo "::error::Fill in admin_email and add the GitHub secret ADMIN_PASSWORD (12+ characters)."; exit 1; }
               printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=/usr/local/php84/bin/php; [ -x /usr/local/php83/bin/php ] && PHP=/usr/local/php83/bin/php; \$PHP bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
               echo "Now delete the ADMIN_PASSWORD secret from GitHub." ;;
+            unpack-takeout)
+              remote "\$PHP bin/unpack-takeout.php" ;;
             import-blogger-dry-run)
               remote "\$PHP bin/import-blogger.php storage/import/feed.atom --dry-run" ;;
             import-blogger)
