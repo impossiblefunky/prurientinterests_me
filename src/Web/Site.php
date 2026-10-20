@@ -672,7 +672,7 @@ final class Site
         $html = implode("\n", array_map(fn($p) => '<p>' . nl2br(e(trim($p))) . '</p>', $paras));
         $pdo->prepare('INSERT INTO comments_archive (story_id, author, author_email, body_html, status, commented_at, created_at, source_id, ip_hash) VALUES (?, ?, ?, ?, "pending", UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, ?)')
             ->execute([$story['id'], $name, $email, $html, 'site:' . bin2hex(random_bytes(8)), Forms::ipHash()]);
-        $this->notifyOwner('Comment waiting on ' . $story['title'], ($name !== '' ? $name : 'Anonymous') . " wrote:\n\n$text\n\nApprove or delete it in the admin Inbox.\n", $email);
+        $this->notifyOwner('Comment waiting on ' . $story['title'], ($name !== '' ? $name : 'Anonymous') . " wrote:\n\n$text\n\nApprove or delete it here: " . site_url('/admin/inbox') . "\n", $email);
         header('Location: ' . story_url($story) . '?comment=pending#comments', true, 303);
     }
 
