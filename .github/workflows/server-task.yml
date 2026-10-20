@@ -29,6 +29,7 @@ on:
           - make-series-preview
           - make-series
           - publish-images
+          - add-amazon-books
           - import-images-dry-run
           - import-images
           - spellcheck
@@ -131,6 +132,8 @@ jobs:
               remote "\$PHP bin/rebuild-gallery.php" ;;
             make-series-preview)
               remote "\$PHP bin/make-series.php --preview" ;;
+            add-amazon-books)
+              remote "\$PHP bin/add-amazon-books.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)

@@ -3,6 +3,7 @@
 <h1>Take the stories<br>with you.</h1>
 <?php include __DIR__ . '/partials/interest_links.php'; ?>
 <p class="lead">Books by <?= e(setting('author_name', setting('site_title'))) ?>.</p>
+<p><a href="https://www.amazon.com/stores/Louis-Friend/author/B007IJ8WAQ/allbooks" target="_blank" rel="noopener noreferrer">See every title on the Amazon author page <span class="nowrap">&#8599;<span class="sr-only"> (opens in a new tab)</span></span></a></p>
 <?php foreach ($books as $b): $buy = array_values(array_filter($b['editions'], fn($e) => $e['purchase_url'] !== '')); ?>
 <article class="book" id="<?= e($b['slug']) ?>">
   <?= View_cover($b) ?>
@@ -10,7 +11,7 @@
     <p class="eyebrow">Book</p>
     <h2><?= e($b['title']) ?></h2>
     <?php if ($b['subtitle'] !== ''): ?><p class="meta"><?= e($b['subtitle']) ?></p><?php endif; ?>
-    <div class="prose"><?= prose($b['description_html']) ?></div>
+    <?php if (trim((string) $b['description_html']) !== ''): ?><div class="prose"><?= prose($b['description_html']) ?></div><?php endif; ?>
     <?php if ($b['editions']): ?>
     <h3 class="small">Available editions</h3>
     <ul class="editions"><?php foreach ($b['editions'] as $ed): ?>
