@@ -62,9 +62,22 @@ jobs:
 
       - name: Install dependencies and run database migrations
         run: |
-          ssh "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}" \
-            "cd '${{ secrets.DH_PATH }}' && \
-             mkdir -p storage/logs storage/cache storage/sessions storage/import storage/reports public/uploads && \
-             \$HOME/bin/composer install --no-dev --optimize-autoloader --no-interaction && \
-             if [ -f .env ]; then php bin/migrate.php; else echo 'No .env yet: skipping migrations. Run the Server task called write-env first.'; fi && \
-             echo 'deployed at' \$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ssh "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}" "bash -s" <<'REMOTE'
+          set -e
+          cd '${{ secrets.DH_PATH }}'
+          # The website runs PHP 8.3 but DreamHost's plain `php` command is older, so use the 8.3 program explicitly.
+          PHP=""
+          for c in /usr/local/php84/bin/php /usr/local/php83/bin/php; do [ -x "$c" ] && PHP="$c" && break; done
+          [ -n "$PHP" ] || { echo "PHP 8.3 was not found on the server"; exit 1; }
+          echo "Using $($PHP -v | head -1)"
+          mkdir -p storage/logs storage/cache storage/sessions storage/import storage/reports public/uploads
+          # Composer (PHP's package installer): download once, check its fingerprint, keep it inside this project.
+          if [ ! -f storage/cache/composer.phar ]; then
+            curl -fsSL https://getcomposer.org/download/latest-stable/composer.phar -o storage/cache/composer.phar
+            curl -fsSL https://getcomposer.org/download/latest-stable/composer.phar.sha256sum -o storage/cache/composer.phar.sha256sum
+            (cd storage/cache && sha256sum -c composer.phar.sha256sum)
+          fi
+          $PHP storage/cache/composer.phar install --no-dev --optimize-autoloader --no-interaction
+          if [ -f .env ]; then $PHP bin/migrate.php; else echo "No .env yet: skipping migrations. Run the Server task called write-env first."; fi
+          echo "deployed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          REMOTE

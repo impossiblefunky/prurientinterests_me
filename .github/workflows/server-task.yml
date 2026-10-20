@@ -87,10 +87,11 @@ jobs:
           DIR: ${{ secrets.DH_PATH }}
         run: |
           set -euo pipefail
-          remote() { ssh -o BatchMode=yes "$HOST" "cd '$DIR' && $1"; }
+          # DreamHost's plain `php` on the command line is older than the one the website uses, so pick 8.3 explicitly.
+          remote() { ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=\$( for c in /usr/local/php84/bin/php /usr/local/php83/bin/php; do [ -x \$c ] && echo \$c && break; done ); [ -n \"\$PHP\" ] || { echo 'PHP 8.3 was not found on the server'; exit 1; }; $1"; }
           case "$TASK" in
             check)
-              remote "echo 'Connected as' \$(whoami) 'in' \$(pwd); php -v | head -1; ls -1 | head -20; test -f .env && echo '.env: present' || echo '.env: MISSING (run write-env)'" ;;
+              remote "echo 'Connected as' \$(whoami) 'in' \$(pwd); echo 'Using PHP:' \$PHP; \$PHP -v | head -1; echo 'Plain php:' \$(php -v | head -1); ls -1 | head -20; test -f .env && echo '.env: present' || echo '.env: MISSING (run write-env)'; echo 'Database tools:'; \$PHP -m | grep -i -E 'pdo_mysql|mbstring|dom|gd|zip|xml' | tr '\n' ' '; echo" ;;
             write-env)
               for v in DB_HOST DB_NAME DB_USER DB_PASSWORD; do [ -n "${!v}" ] || { echo "::error::Add the GitHub secret $v first."; exit 1; }; done
               if [ "$OVERWRITE" != "true" ] && remote "test -f .env"; then echo ".env already exists, so it was left alone. Tick overwrite_env to replace it."; exit 0; fi
@@ -99,25 +100,25 @@ jobs:
                 | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && umask 077 && cat > .env && chmod 600 .env"
               echo "Wrote .env (the secret values are not shown)." ;;
             migrate)
-              remote "php bin/migrate.php" ;;
+              remote "\$PHP bin/migrate.php" ;;
             create-admin)
               [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] || { echo "::error::Fill in admin_email and add the GitHub secret ADMIN_PASSWORD (12+ characters)."; exit 1; }
-              printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && php bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
+              printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=/usr/local/php83/bin/php; [ -x /usr/local/php84/bin/php ] && PHP=/usr/local/php84/bin/php; \$PHP bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
               echo "Now delete the ADMIN_PASSWORD secret from GitHub." ;;
             import-blogger-dry-run)
-              remote "php bin/import-blogger.php storage/import/feed.atom --dry-run" ;;
+              remote "\$PHP bin/import-blogger.php storage/import/feed.atom --dry-run" ;;
             import-blogger)
-              remote "php bin/import-blogger.php storage/import/feed.atom" ;;
+              remote "\$PHP bin/import-blogger.php storage/import/feed.atom" ;;
             import-images-dry-run)
-              remote "php bin/import-images.php storage/import/takeout.zip --dry-run" ;;
+              remote "\$PHP bin/import-images.php storage/import/takeout.zip --dry-run" ;;
             import-images)
-              remote "php bin/import-images.php storage/import/takeout.zip" ;;
+              remote "\$PHP bin/import-images.php storage/import/takeout.zip" ;;
             spellcheck)
-              remote "php bin/spellcheck.php" ;;
+              remote "\$PHP bin/spellcheck.php" ;;
             apply-spelling-preview)
-              remote "php bin/apply-spelling.php" ;;
+              remote "\$PHP bin/apply-spelling.php" ;;
             apply-spelling)
-              remote "php bin/apply-spelling.php --write" ;;
+              remote "\$PHP bin/apply-spelling.php --write" ;;
             *) echo "::error::Unknown task"; exit 1 ;;
           esac
 
