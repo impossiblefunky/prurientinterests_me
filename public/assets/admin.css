@@ -59,3 +59,8 @@ td input[type=checkbox],th input[type=checkbox]{width:1.25rem;min-height:0}
 .dupe-list img{display:block;width:100%;max-height:14rem;object-fit:contain;background:var(--panel2);border:1px solid var(--line-soft)}
 .dupe-list p{margin:.5rem 0}
 .inbox-item{border-top:1px solid var(--line);padding:1rem 0;max-width:52rem}
+
+/* New-item dot in the left navigation */
+.sidebar .navbtn{display:flex;align-items:center;justify-content:space-between}
+.navbtn .dot{flex:none;width:.7rem;height:.7rem;margin-left:.75rem;border-radius:50%;background:var(--rose);box-shadow:0 0 0 3px rgba(224,166,194,.28)}
+main section+section{margin-top:2.5rem}

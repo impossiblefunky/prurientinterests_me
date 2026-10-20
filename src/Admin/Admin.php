@@ -226,7 +226,13 @@ final class Admin
         } elseif ($res === 'settings') {
             $this->settings($method);
         } elseif ($res === 'inbox') {
-            $this->inbox($method, array_slice($parts, 1));
+            // old address (the alert emails used it): send the visitor to whichever list has something new
+            $b = $this->badges();
+            header('Location: ' . ($b['comments'] === 0 && $b['messages'] > 0 ? '/admin/messages' : '/admin/comments'), true, 303);
+        } elseif ($res === 'comments') {
+            $this->comments($method, array_slice($parts, 1));
+        } elseif ($res === 'messages') {
+            $this->messages($method, array_slice($parts, 1));
         } elseif (isset($this->resources()[$res])) {
             $this->resource($res, $method, array_slice($parts, 1));
         } else {
@@ -917,42 +923,69 @@ final class Admin
         $this->page('Duplicate images', View::partial('admin/duplicates', ['groups' => $groups, 'waiting' => $waiting, 'csrf' => Auth::csrf()]));
     }
 
-    /** Comments waiting for approval and messages from the contact form. */
-    private function inbox(string $method, array $rest): void
+    /** Comments left on this site: approve, hide again, or delete. */
+    private function comments(string $method, array $rest): void
     {
         if ($method === 'POST') {
-            [$kind, $id, $do] = array_pad($rest, 3, '');
+            [$id, $do] = array_pad($rest, 2, '');
             $id = (int) $id;
-            if ($kind === 'comment' && $id) {
+            if ($id) {
                 if ($do === 'approve') {
-                    $this->pdo->prepare('UPDATE comments_archive SET status = "LIVE" WHERE id = ?')->execute([$id]);
-                    $this->flash('Comment approved. It is now visible.');
+                    $this->pdo->prepare('UPDATE comments_archive SET status = "LIVE" WHERE id = ? AND source_id LIKE "site:%"')->execute([$id]);
+                    $this->flash('Comment approved. It is now visible under the story.');
+                } elseif ($do === 'hide') {
+                    $this->pdo->prepare('UPDATE comments_archive SET status = "pending" WHERE id = ? AND source_id LIKE "site:%"')->execute([$id]);
+                    $this->flash('Comment hidden again. It is back in the waiting list.');
                 } elseif ($do === 'delete') {
                     $this->pdo->prepare('DELETE FROM comments_archive WHERE id = ? AND source_id LIKE "site:%"')->execute([$id]);   // only comments left on this site, never the imported ones
                     $this->flash('Comment deleted.');
                 }
-            } elseif ($kind === 'message' && $id) {
+            }
+            header('Location: /admin/comments', true, 303);
+            return;
+        }
+        $sel = 'SELECT c.id, c.author, c.author_email, c.body_html, c.commented_at, s.title AS story, s.slug, s.legacy_path FROM comments_archive c LEFT JOIN stories s ON s.id = c.story_id ';
+        $waiting = $this->pdo->query($sel . 'WHERE c.status = "pending" ORDER BY c.commented_at')->fetchAll();
+        $approved = $this->pdo->query($sel . 'WHERE c.status = "LIVE" AND c.source_id LIKE "site:%" ORDER BY c.commented_at DESC LIMIT 30')->fetchAll();
+        $this->page('Comments', View::partial('admin/comments', ['waiting' => $waiting, 'approved' => $approved, 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
+    }
+
+    /** Messages from the contact form. */
+    private function messages(string $method, array $rest): void
+    {
+        if ($method === 'POST') {
+            [$id, $do] = array_pad($rest, 2, '');
+            if ($id === 'all' && $do === 'read') {
+                $this->pdo->exec('UPDATE contact_messages SET status = "read" WHERE status = "new"');
+                $this->flash('All messages marked as read.');
+            } elseif ((int) $id) {
+                $id = (int) $id;
                 if ($do === 'read') {
                     $this->pdo->prepare('UPDATE contact_messages SET status = "read" WHERE id = ?')->execute([$id]);
+                } elseif ($do === 'unread') {
+                    $this->pdo->prepare('UPDATE contact_messages SET status = "new" WHERE id = ?')->execute([$id]);
                 } elseif ($do === 'delete') {
                     $this->pdo->prepare('DELETE FROM contact_messages WHERE id = ?')->execute([$id]);
                     $this->flash('Message deleted.');
                 }
             }
-            header('Location: /admin/inbox', true, 303);
+            header('Location: /admin/messages', true, 303);
             return;
         }
-        $comments = $this->pdo->query('SELECT c.id, c.author, c.author_email, c.body_html, c.commented_at, s.title AS story FROM comments_archive c LEFT JOIN stories s ON s.id = c.story_id WHERE c.status = "pending" ORDER BY c.commented_at')->fetchAll();
-        $messages = $this->pdo->query('SELECT * FROM contact_messages ORDER BY (status = "new") DESC, created_at DESC LIMIT 100')->fetchAll();
-        $this->page('Inbox', View::partial('admin/inbox', ['comments' => $comments, 'messages' => $messages, 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
+        $messages = $this->pdo->query('SELECT * FROM contact_messages ORDER BY (status = "new") DESC, created_at DESC LIMIT 200')->fetchAll();
+        $this->page('Messages', View::partial('admin/messages', ['messages' => $messages, 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
     }
 
-    private function inboxCount(): int
+    /** @return array{comments:int,messages:int} what is waiting for Mike: comments to approve, messages not yet read */
+    private function badges(): array
     {
         try {
-            return (int) $this->pdo->query('SELECT (SELECT COUNT(*) FROM comments_archive WHERE status = "pending") + (SELECT COUNT(*) FROM contact_messages WHERE status = "new")')->fetchColumn();
+            return [
+                'comments' => (int) $this->pdo->query('SELECT COUNT(*) FROM comments_archive WHERE status = "pending"')->fetchColumn(),
+                'messages' => (int) $this->pdo->query('SELECT COUNT(*) FROM contact_messages WHERE status = "new"')->fetchColumn(),
+            ];
         } catch (\Throwable) {
-            return 0;
+            return ['comments' => 0, 'messages' => 0];
         }
     }
 
@@ -961,6 +994,6 @@ final class Admin
         $flash = $_SESSION['flash'] ?? '';
         unset($_SESSION['flash']);
         header('Content-Type: text/html; charset=utf-8');
-        echo View::partial('admin/layout', ['title' => $title, 'body' => $body, 'flash' => $flash, 'csrf' => Auth::csrf(), 'user' => Auth::user(), 'resources' => $this->resources(), 'inbox' => $this->inboxCount()]);
+        echo View::partial('admin/layout', ['title' => $title, 'body' => $body, 'flash' => $flash, 'csrf' => Auth::csrf(), 'user' => Auth::user(), 'resources' => $this->resources(), 'badges' => $this->badges()]);
     }
 }
