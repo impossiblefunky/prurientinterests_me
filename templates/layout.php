@@ -19,6 +19,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
+<?php if (($gsv = trim((string) setting('google_site_verification', ''))) !== '' && preg_match('/^[A-Za-z0-9_-]{10,100}$/', $gsv)): ?><meta name="google-site-verification" content="<?= e($gsv) ?>"><?php endif; ?>
 <meta name="rating" content="adult">
 <?php if ($robots): ?><meta name="robots" content="<?= e($robots) ?>">
 <?php endif; ?>

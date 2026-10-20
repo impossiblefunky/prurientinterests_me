@@ -310,10 +310,13 @@ final class Site
         }
         $rel = $pdo->prepare($this->listSql() . ' AND s.id <> ? ORDER BY (SELECT COUNT(*) FROM item_tags a JOIN item_tags b ON a.tag_id = b.tag_id WHERE a.item_type = "story" AND b.item_type = "story" AND a.item_id = s.id AND b.item_id = ?) DESC, s.published_at DESC LIMIT 3');
         $rel->execute([$s['id'], $s['id']]);
+        $cm = $pdo->prepare('SELECT author, body_html, commented_at FROM comments_archive WHERE story_id = ? AND status = "LIVE" ORDER BY commented_at, id');
+        $cm->execute([$s['id']]);
+        $comments = $cm->fetchAll();
         $desc = $s['summary'] !== '' ? $s['summary'] : excerpt($s['body_html']);
         $url = site_url(story_url($s));
         $author = $s['author'] !== '' ? $s['author'] : setting('author_name', setting('site_title'));
-        $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author], [
+        $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author, 'comments' => $comments], [
             'title' => $s['title'] . ' | ' . setting('site_title'),
             'description' => $desc,
             'canonical' => $url,

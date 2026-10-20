@@ -279,7 +279,8 @@ final class Admin
     private function settings(string $method): void
     {
         $names = ['site_title' => 'Site title', 'author_name' => 'Pen name (shown on stories and books)', 'tagline' => 'Tagline', 'home_eyebrow' => 'Homepage small heading',
-            'home_headline' => 'Homepage headline', 'home_intro' => 'Homepage introduction', 'footer_note' => 'Footer note'];
+            'home_headline' => 'Homepage headline', 'home_intro' => 'Homepage introduction', 'footer_note' => 'Footer note',
+            'google_site_verification' => 'Google Search Console verification code (just the code from the meta tag)'];
         $errors = [];
         if ($method === 'POST') {
             foreach ($names as $n => $label) {

@@ -26,6 +26,8 @@ on:
           - rebuild-gallery-preview
           - rebuild-gallery
           - rebuild-search
+          - make-series-preview
+          - make-series
           - import-images-dry-run
           - import-images
           - spellcheck
@@ -126,6 +128,10 @@ jobs:
               remote "\$PHP bin/rebuild-gallery.php --preview" ;;
             rebuild-gallery)
               remote "\$PHP bin/rebuild-gallery.php" ;;
+            make-series-preview)
+              remote "\$PHP bin/make-series.php --preview" ;;
+            make-series)
+              remote "\$PHP bin/make-series.php" ;;
             rebuild-search)
               remote "\$PHP bin/rebuild-search.php --all" ;;
             import-book-covers)

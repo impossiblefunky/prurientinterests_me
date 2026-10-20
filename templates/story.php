@@ -1,4 +1,4 @@
-<?php /** @var array $s @var array $tags @var array $related @var ?array $prev @var ?array $next @var int $chapters @var string $author */ ?>
+<?php /** @var array $s @var array $tags @var array $related @var ?array $prev @var ?array $next @var int $chapters @var string $author @var array $comments */ ?>
 <article class="reading">
   <div class="reading-tools" role="group" aria-label="Reading options" hidden>
     <button type="button" class="linkbtn" data-toggle="paper" aria-pressed="false">Paper reading mode</button>
@@ -23,6 +23,16 @@
   </nav>
   <?php endif; ?>
 </article>
+<?php if ($comments): ?>
+<section class="band comments" aria-labelledby="comments-h"><h2 id="comments-h">Comments from the original blog (<?= count($comments) ?>)</h2>
+  <?php foreach ($comments as $c): ?>
+  <article class="comment">
+    <p class="meta"><strong><?= e($c['author'] !== '' ? $c['author'] : 'Anonymous') ?></strong><?php if ($c['commented_at']): ?> · <time datetime="<?= e(gmdate('Y-m-d', strtotime($c['commented_at'] . ' UTC'))) ?>"><?= e(format_date($c['commented_at'])) ?></time><?php endif; ?></p>
+    <div class="prose"><?= prose($c['body_html']) ?></div>
+  </article>
+  <?php endforeach; ?>
+</section>
+<?php endif; ?>
 <?php if ($related): ?>
 <section class="band" aria-labelledby="more"><h2 id="more">More to read</h2>
   <div class="grid"><?php foreach ($related as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>

@@ -164,3 +164,7 @@ mark{background:#5d3347;color:var(--text);padding:0 .15em;border-radius:.15em}
 html.paper mark{background:#f2d27a;color:#241b20}
 .gallery figcaption{color:var(--text)}
 @media (max-width:48rem){.site-search{margin-left:0;width:100%}.site-search input{flex:1}}
+
+/* Comments carried over from the old blog */
+.comments .comment { border-top: 1px solid var(--line, rgba(214, 140, 160, .35)); padding: 1rem 0; max-width: 46rem; }
+.comments .comment .meta { margin: 0 0 .4rem; }
