@@ -26,12 +26,21 @@ $scan = function (string $html, string $where) use (&$found, $mine): void {
     if (!preg_match_all('#<(?:a|img)\b[^>]*?\b(?:href|src)="(https?://[^"\s]+)"#i', $html, $m)) {
         return;
     }
+    $pics = [];
+    if (preg_match_all('#<img\b[^>]*?\bsrc="(https?://[^"\s]+)"#i', $html, $pm)) {
+        foreach ($pm[1] as $pu) {
+            $pics[preg_replace('/#.*$/', '', html_entity_decode($pu, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? $pu] = true;
+        }
+    }
     foreach (array_unique($m[1]) as $u) {
         $u = html_entity_decode($u, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $u = preg_replace('/#.*$/', '', $u) ?? $u;
         $host = strtolower((string) parse_url($u, PHP_URL_HOST));
         if ($host === '' || in_array($host, $mine, true)) {
             continue;
+        }
+        if (isset($pics[$u])) {
+            $found[$u]['img'] = true;
         }
         $found[$u]['n'] = ($found[$u]['n'] ?? 0) + 1;
         if (count($found[$u]['where'] ?? []) < 3) {
@@ -143,13 +152,33 @@ $strip = in_array('--strip', $argv, true);
 if ($strip || in_array('--strip-preview', $argv, true)) {
     // Only links that are certainly gone: the page answered 404/410, or the site name no longer exists (after the slow retry).
     $gone = [];
+    // Browsers load pictures on this https site over https even when the old post says http://, so a picture whose
+    // site has no working https version is broken for visitors even though the plain http address still answers.
+    $httpPics = array_values(array_filter(array_keys($found), fn($u) => !empty($found[$u]['img']) && str_starts_with($u, 'http://')));
+    $secure = [];
+    if ($httpPics) {
+        echo count($httpPics) . " pictures use http://; checking they also load over https...\n";
+        $variants = [];
+        foreach ($httpPics as $u) {
+            $variants['https://' . substr($u, 7)] = $u;
+        }
+        foreach (probe(array_keys($variants), true, 8) as $v => $r2) {
+            $secure[$variants[$v]] = $r2;
+        }
+    }
     foreach ($found as $u => $info) {
         $r = $res[$u] ?? ['code' => 0, 'err' => 28];
-        if (preg_match('/pornoperson|pr0noperson/i', $u)) {
-            continue;   // Mike's own profile addresses are never removed automatically, even when a site answers a robot oddly
+        $isPic = !empty($info['img']);
+        if (!$isPic && preg_match('/pornoperson|pr0noperson/i', $u)) {
+            continue;   // Mike's own profile addresses are never removed automatically (pictures are judged on their own)
         }
         if (in_array($r['code'], [404, 410], true) || ($r['code'] === 0 && $r['err'] === 6)) {
             $gone[$u] = true;
+        } elseif ($isPic && isset($secure[$u])) {
+            $r2 = $secure[$u];
+            if (in_array($r2['code'], [404, 410], true) || ($r2['code'] === 0 && in_array($r2['err'], [6, 7, 35, 51, 58, 60], true))) {
+                $gone[$u] = true;   // no usable https version: the visitor's browser cannot show it
+            }
         }
     }
     echo count($gone) . " links are certainly dead.\n";
