@@ -258,3 +258,22 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .crumbs{margin:-1.25rem 0 1rem}
 .radios label{display:inline-flex;align-items:center;gap:.5rem;min-height:44px;padding-right:.75rem}
 .crumbs li{display:flex;align-items:center}
+
+/* Phone menu button (shown only when the script is running and the screen is narrow) */
+.menu-toggle{display:none;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:1px solid var(--rose);background:transparent;color:var(--rose);cursor:pointer;border-radius:0}
+.menu-toggle svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.menu-toggle .cross{display:none}
+.menu-toggle[aria-expanded=true] .bars{display:none}
+.menu-toggle[aria-expanded=true] .cross{display:inline}
+.menu-toggle:hover,.menu-toggle[aria-expanded=true]{background:var(--panel);color:var(--text)}
+@media (max-width:40rem){
+  .has-menu .brand{flex:1 1 0;min-width:0}
+  .has-menu .menu-toggle{display:inline-flex;order:2}
+  .has-menu .brand{order:1}
+  .has-menu .site-search{order:3}
+  .has-menu nav{order:4;display:none;width:100%}
+  .has-menu.open nav{display:block}
+  .has-menu.open{max-height:100vh;overflow-y:auto}
+  .has-menu nav ul{flex-direction:column;gap:.4rem}
+  .has-menu nav .navbtn{width:100%}
+}

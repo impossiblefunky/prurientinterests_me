@@ -53,8 +53,9 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php if (empty($meta['bare'])): ?>
 <header class="site-header">
   <a class="brand" href="/"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag"><?= e(setting('tagline')) ?></span></a>
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav" hidden><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path class="bars" d="M3 6h18M3 12h18M3 18h18"/><path class="cross" d="M5 5l14 14M19 5 5 19"/></svg><span class="sr-only">Menu</span></button>
   <form class="site-search" method="get" action="/search" role="search"><label for="hq" class="sr-only">Search the site</label><input id="hq" name="q" type="search" placeholder="Search…" value="<?= e((string) ($_GET['q'] ?? '')) ?>"><button class="btn primary search-btn" type="submit"><svg class="search-icon" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 4.5 4.5"/></svg>Search</button></form>
-  <nav aria-label="Main"><ul>
+  <nav aria-label="Main" id="main-nav"><ul>
     <?php foreach ($d['nav']['header'] as $n): ?><li><a class="navbtn" href="<?= e($n['url']) ?>"<?= $current($n['url']) ? ' aria-current="page"' : '' ?>><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>
   </ul></nav>

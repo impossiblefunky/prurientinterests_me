@@ -1,4 +1,18 @@
 (function () {
+  // Phone menu: the main links fold behind a button on small screens (search stays visible).
+  var header = document.querySelector('.site-header'), btn = header && header.querySelector('.menu-toggle');
+  if (!btn) return;
+  var nav = document.getElementById('main-nav');
+  btn.hidden = false;
+  header.classList.add('has-menu');
+  var set = function (open) { header.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  btn.addEventListener('click', function () { set(btn.getAttribute('aria-expanded') !== 'true'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { set(false); btn.focus(); }
+  });
+  nav.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
+})();
+(function () {
   // Reading options on story pages: paper mode and larger text, remembered on this device.
   var tools = document.querySelector('.reading-tools');
   if (!tools) return;
