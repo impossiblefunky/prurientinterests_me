@@ -28,6 +28,7 @@ on:
           - rebuild-search
           - make-series-preview
           - make-series
+          - publish-images
           - import-images-dry-run
           - import-images
           - spellcheck
@@ -130,6 +131,8 @@ jobs:
               remote "\$PHP bin/rebuild-gallery.php" ;;
             make-series-preview)
               remote "\$PHP bin/make-series.php --preview" ;;
+            publish-images)
+              remote "\$PHP bin/publish-images.php" ;;
             make-series)
               remote "\$PHP bin/make-series.php" ;;
             rebuild-search)
