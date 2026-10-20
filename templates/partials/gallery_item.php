@@ -5,6 +5,6 @@
     <?= e($g['caption']) ?>
     <?php if ($g['credit'] !== '' || $g['source_url'] !== ''): ?><span class="credit"><?php
       $label = $g['credit'] !== '' ? $g['credit'] : 'Source';
-      if ($g['source_url'] !== ''): ?><a href="<?= e($g['source_url']) ?>" target="_blank" rel="noopener noreferrer"><span class="nowrap"><?= e($label) ?><span class="sr-only"> (opens in a new tab)</span></span></a><?php else: ?><?= e($label) ?><?php endif; ?></span><?php endif; ?>
+      if ($g['source_url'] !== ''): ?><a href="<?= e($g['source_url']) ?>" target="_blank" rel="noopener noreferrer"><?= ext_label(e($label)) ?></a><?php else: ?><?= e($label) ?><?php endif; ?></span><?php endif; ?>
   </figcaption><?php endif; ?>
 </figure></li>

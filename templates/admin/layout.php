@@ -11,7 +11,7 @@ $on = fn(string $u) => $here === $u || str_starts_with($here, $u . '/'); ?><!doc
 <a class="skip" href="#main">Skip to main content</a>
 <header class="site-header"><a class="brand" href="/admin"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag">Admin</span></a>
 <nav aria-label="Admin tools"><ul>
-<li><a class="navbtn" href="/" target="_blank" rel="noopener"><span class="nowrap">View site<span class="sr-only"> (opens in a new tab)</span></span></a></li>
+<li><a class="navbtn" href="/" target="_blank" rel="noopener"><?= ext_label('View site') ?></a></li>
 <li><form method="get" action="/admin/logout"><button class="btn" type="submit">Sign out</button></form></li>
 </ul></nav></header>
 <div class="desk">

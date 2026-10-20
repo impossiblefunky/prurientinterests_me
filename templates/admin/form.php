@@ -55,7 +55,7 @@ $viewUrl = $id && $key === 'stories' ? story_url(['slug' => $values['slug'] ?? '
     <?php if ($revisions): ?><h2>Revision history</h2><p class="meta"><?= count($revisions) ?> earlier version<?= count($revisions) === 1 ? '' : 's' ?> saved. See below.</p><?php elseif ($key === 'stories'): ?><h2>Revision history</h2><p class="meta">Saved versions will appear here after you edit.</p><?php endif; ?>
   </aside><?php endif; ?>
 </div>
-<p class="actions"><button class="btn primary" type="submit">Save</button> <a class="btn" href="/admin/<?= e($key) ?>">Cancel</a><?php if ($viewUrl): ?> <a class="btn" href="<?= e($viewUrl) ?>" target="_blank" rel="noopener"><span class="nowrap">Preview layout &rarr;<span class="sr-only"> (opens in a new tab)</span></span></a><?php endif; ?></p>
+<p class="actions"><button class="btn primary" type="submit">Save</button> <a class="btn" href="/admin/<?= e($key) ?>">Cancel</a><?php if ($viewUrl): ?> <a class="btn" href="<?= e($viewUrl) ?>" target="_blank" rel="noopener"><?= ext_label('Preview layout') ?></a><?php endif; ?></p>
 </form>
 <?php if ($id && !empty($def['merge'])): ?>
 <section class="boxed"><h2>Merge duplicates</h2>

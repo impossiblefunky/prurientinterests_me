@@ -98,6 +98,25 @@ function qs(array $cur, array $over = []): string
     return $all ? '?' . http_build_query($all) : '';
 }
 
+/** The little "opens in a new window" icon (decorative; the words are for screen readers). */
+function ext_icon(): string
+{
+    return '<svg class="ext-icon" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><path d="M9 2h5v5M14 2 7.5 8.5M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5"/></svg>';
+}
+
+/** Link text for an outside link: the last word and the icon share one no-wrap span, so the icon never sits alone on a line. */
+function ext_label(string $html, string $note = ' (opens in a new tab)'): string
+{
+    $sr = '<span class="sr-only">' . $note . '</span>';
+    if (stripos($html, '<img') !== false) {
+        return $html . $sr;
+    }
+    if (preg_match('#^(.*?)([^\s<>]+)((?:</[^>]+>)*)\s*$#s', $html, $m)) {
+        return $m[1] . '<span class="nowrap">' . $m[2] . ext_icon() . $sr . '</span>' . $m[3];
+    }
+    return '<span class="nowrap">' . ext_icon() . $sr . '</span>';
+}
+
 /** Story text for display: outside links open in a new tab and say so to screen readers. */
 function prose(string $html): string
 {
@@ -108,13 +127,15 @@ function prose(string $html): string
         }
         return '<a ' . $m[1] . ' aria-label="View picture">' . $m[2] . '</a>';
     }, $html) ?? $html;
-    return preg_replace_callback('#<a href="(https?://[^"]+)"(?: rel="noopener")?>(.*?)</a>#is', function (array $m): string {
-        $host = parse_url($m[1], PHP_URL_HOST);
+    return preg_replace_callback('#<a\b([^>]*?)\bhref="(https?://[^"]+)"([^>]*)>(.*?)</a>#is', function (array $m): string {
+        $host = parse_url(html_entity_decode($m[2]), PHP_URL_HOST);
         $mine = parse_url((string) \App\Support\Env::get('APP_URL', ''), PHP_URL_HOST);
         if ($host && $mine && strcasecmp($host, $mine) === 0) {
-            return '<a href="' . $m[1] . '">' . $m[2] . '</a>';
+            return $m[0];
         }
-        return '<a href="' . $m[1] . '" target="_blank" rel="noopener noreferrer">' . $m[2] . '<span class="sr-only"> (opens in a new tab)</span></a>';
+        // Keep other attributes (such as a picture link's name) but replace target and rel with ours.
+        $attrs = trim(preg_replace('#\s(?:target|rel)="[^"]*"#i', '', ' ' . $m[1] . ' ' . $m[3]));
+        return '<a href="' . $m[2] . '" target="_blank" rel="noopener noreferrer"' . ($attrs !== '' ? ' ' . $attrs : '') . '>' . ext_label($m[4]) . '</a>';
     }, $html) ?? $html;
 }
 

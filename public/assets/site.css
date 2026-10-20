@@ -248,3 +248,4 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .contact-side .prose{font-size:1.1rem;line-height:1.7}
 .contact-side .prose p{margin:0 0 1rem}
 @media (max-width:64rem){.contact-main,.contact-side{grid-column:1/-1}.contact-side{border-left:0;padding-left:0;border-top:1px solid var(--line-soft);padding-top:1.5rem}}
+.ext-icon{width:.9em;height:.9em;margin-left:.25em;vertical-align:-.1em;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
