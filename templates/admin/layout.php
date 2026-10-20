@@ -1,4 +1,4 @@
-<?php /** @var string $title @var string $body @var string $flash @var string $csrf @var ?array $user @var array $resources */
+<?php /** @var string $title @var string $body @var string $flash @var string $csrf @var ?array $user @var array $resources @var int $inbox */
 $here = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $groups = [];
 foreach ($resources as $k => $r) { $groups[$r['group']][] = [$r['label'], '/admin/' . $k]; }
@@ -17,6 +17,7 @@ $on = fn(string $u) => $here === $u || str_starts_with($here, $u . '/'); ?><!doc
 <div class="desk">
 <nav class="sidebar" aria-label="The writing desk"><p class="eyebrow">The writing desk</p>
 <p><a class="navbtn<?= $here === '/admin' ? ' on' : '' ?>" href="/admin"<?= $here === '/admin' ? ' aria-current="page"' : '' ?>>Dashboard</a></p>
+<p><a class="navbtn<?= $on('/admin/inbox') ? ' on' : '' ?>" href="/admin/inbox"<?= $on('/admin/inbox') ? ' aria-current="page"' : '' ?>>Inbox<?= $inbox ? ' (' . (int) $inbox . ')' : '' ?></a></p>
 <?php foreach ($groups as $g => $links): ?>
 <h2 class="grp"><?= e($g) ?></h2><ul><?php foreach ($links as [$label, $url]): ?><li><a class="navbtn<?= $on($url) ? ' on' : '' ?>" href="<?= e($url) ?>"<?= $on($url) ? ' aria-current="page"' : '' ?>><?= e($label) ?></a></li><?php endforeach; ?></ul>
 <?php endforeach; ?>

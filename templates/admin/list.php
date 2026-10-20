@@ -1,7 +1,7 @@
 <?php /** @var string $key @var array $def @var array $rows @var string $csrf @var DateTimeZone $tz @var int $page @var int $pages @var int $total */
 $fmt = function (string $col, $v) use ($tz) {
     if (in_array($col, ['published_at', 'updated_at', 'created_at'], true) && $v) { return (new DateTimeImmutable((string) $v, new DateTimeZone('UTC')))->setTimezone($tz)->format('M j, Y g:i a'); }
-    if ($col === 'featured') { return $v ? 'Yes' : ''; }
+    if ($col === 'featured' || $col === 'hidden') { return $v ? 'Yes' : ''; }
     return (string) $v;
 }; ?>
 <?php if (!empty($def['help'])): ?><p class="meta"><?= e($def['help']) ?></p><?php endif; ?>

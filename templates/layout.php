@@ -69,7 +69,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
   <nav aria-label="Footer"><ul>
     <?php foreach ($d['nav']['footer'] as $n): ?><li><a href="<?= e($n['url']) ?>"><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>
-    <li><a href="/tags">Interests</a></li><li><a href="/stories">Stories</a></li><li><a href="/gallery">Gallery</a></li><li><a href="/books">Books</a></li><li><a href="/leave">Leave site</a></li>
+    <li><a href="/tags">Interests</a></li><li><a href="/stories">Stories</a></li><li><a href="/gallery">Gallery</a></li><li><a href="/books">Books</a></li><li><a href="/contact">Contact</a></li><li><a href="/leave">Leave site</a></li>
   </ul><p><?= e(setting('footer_note')) ?></p></nav>
 </footer>
 <?php endif; ?>

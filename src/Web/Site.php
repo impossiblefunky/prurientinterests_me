@@ -34,6 +34,9 @@ final class Site
         $r->get('/books', fn() => $this->books());
         $r->get('/about', fn() => $this->page(['about', 'about-prurient-interests']));
         $r->get('/p/{file}', fn(array $p) => $this->legacyPage('/p/' . $p['file']));
+        $r->get('/contact', fn() => $this->contactPage());
+        $r->post('/contact', fn() => $this->contactSubmit());
+        $r->post('/comment', fn() => $this->commentSubmit());
         $r->get('/feed', fn() => $this->feed());
         $r->get('/feeds/posts/default', fn() => $this->feed());   // the address old Blogger readers already subscribe to
         $r->get('/robots.txt', fn() => $this->robots());
@@ -138,9 +141,9 @@ final class Site
             $fill = $pdo->query($this->listSql() . " AND s.kind = 'story' AND s.id NOT IN ($have) ORDER BY s.published_at DESC LIMIT " . (3 - count($picks)))->fetchAll();
             $picks = array_merge($picks, $fill);
         }
-        $tags = $pdo->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 ORDER BY t.sort_order, t.name LIMIT 12')->fetchAll();
+        $tags = $pdo->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 ORDER BY t.sort_order, t.name LIMIT 12')->fetchAll();
         if (!$tags) {
-            $tags = $pdo->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' GROUP BY t.id ORDER BY n DESC LIMIT 8')->fetchAll();
+            $tags = $pdo->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 GROUP BY t.id ORDER BY n DESC LIMIT 8')->fetchAll();
         }
         $albums = $pdo->query('SELECT a.slug, a.title FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.featured DESC, a.sort_order, a.id LIMIT 3')->fetchAll();
         $book = $pdo->query('SELECT * FROM books WHERE status = "published" ORDER BY featured DESC, sort_order, id DESC LIMIT 1')->fetch() ?: null;
@@ -222,7 +225,7 @@ final class Site
             (SELECT COUNT(*) FROM item_tags it JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE it.tag_id = t.id AND it.item_type = "story")
           + (SELECT COUNT(*) FROM item_tags it JOIN gallery_items g ON g.id = it.item_id AND g.status = "published" WHERE it.tag_id = t.id AND it.item_type = "gallery")
           + (SELECT COUNT(*) FROM item_tags it JOIN books b ON b.id = it.item_id AND b.status = "published" WHERE it.tag_id = t.id AND it.item_type = "book") AS n
-            FROM tags t ORDER BY t.name')->fetchAll();
+            FROM tags t WHERE t.hidden = 0 ORDER BY t.name')->fetchAll();
         $rows = array_values(array_filter($rows, fn($r) => (int) $r['n'] > 0));
         $featured = array_values(array_filter($rows, fn($r) => $r['featured']));
         // Split the A-Z list into three balanced columns labelled by their first and last letters.
@@ -292,7 +295,7 @@ final class Site
             $this->notFound();
             return;
         }
-        $tg = $pdo->prepare('SELECT t.slug, t.name FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE it.item_type = "story" AND it.item_id = ? ORDER BY t.name');
+        $tg = $pdo->prepare('SELECT t.slug, t.name FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE it.item_type = "story" AND it.item_id = ? AND t.hidden = 0 ORDER BY t.name');
         $tg->execute([$s['id']]);
         $tags = $tg->fetchAll();
 
@@ -321,7 +324,7 @@ final class Site
         }
         $url = site_url(story_url($s));
         $author = $s['author'] !== '' ? $s['author'] : setting('author_name', setting('site_title'));
-        $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author, 'comments' => $comments], [
+        $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author, 'comments' => $comments, 'form' => $this->form], [
             'title' => $s['title'] . ' | ' . setting('site_title'),
             'description' => $desc,
             'canonical' => $url,
@@ -443,7 +446,7 @@ final class Site
             $bs = $pdo->prepare('SELECT b.slug, b.title FROM books b WHERE b.status = "published" AND (' . implode(' AND ', $bw) . ') ORDER BY b.sort_order');
             $bs->execute($ba);
             $res['books'] = $bs->fetchAll();
-            $ts = $pdo->prepare('SELECT t.slug, t.name FROM tags t WHERE (' . implode(' OR ', $tw) . ') ORDER BY t.name LIMIT 12');
+            $ts = $pdo->prepare('SELECT t.slug, t.name FROM tags t WHERE t.hidden = 0 AND (' . implode(' OR ', $tw) . ') ORDER BY t.name LIMIT 12');
             $ts->execute($ta);
             $res['tags'] = $ts->fetchAll();
         }
@@ -493,6 +496,114 @@ final class Site
         $this->renderPage($st->fetch() ?: null);
     }
 
+    // ---- contact form and comments --------------------------------------------------------------------------
+
+    /** Errors and what the visitor typed, kept for the page that is shown again after a failed submit. */
+    private array $form = [];
+
+    private function contactPage(): void
+    {
+        $st = Db::pdo()->prepare('SELECT * FROM pages WHERE slug = "contact" AND status = "published"');
+        $st->execute();
+        $this->renderPage($st->fetch() ?: ['slug' => 'contact', 'legacy_path' => '/contact', 'title' => 'Contact', 'summary' => 'Send a message to ' . setting('author_name') . '.', 'body_html' => '']);
+    }
+
+    private function clean(string $v, int $max): string
+    {
+        return mb_substr(trim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $v) ?? ''), 0, $max);
+    }
+
+    /** Sends a plain-text notice to the site owner. A failure here never loses the message: it is already saved. */
+    private function notifyOwner(string $subject, string $body, string $replyTo = ''): void
+    {
+        $to = setting('contact_email', 'pornoperson@gmail.com');
+        $host = parse_url((string) \App\Support\Env::get('APP_URL', ''), PHP_URL_HOST) ?: 'localhost';
+        $headers = ['From: ' . setting('site_title') . ' <noreply@' . $host . '>', 'Content-Type: text/plain; charset=UTF-8'];
+        if ($replyTo !== '' && Forms::emailOk($replyTo)) {
+            $headers[] = 'Reply-To: ' . preg_replace('/[\r\n]+/', '', $replyTo);
+        }
+        @mail($to, '=?UTF-8?B?' . base64_encode(preg_replace('/[\r\n]+/', ' ', $subject) ?? '') . '?=', $body, implode("\r\n", $headers));
+    }
+
+    private function contactSubmit(): void
+    {
+        $name = $this->clean((string) ($_POST['name'] ?? ''), 120);
+        $email = $this->clean((string) ($_POST['email'] ?? ''), 190);
+        $msg = $this->clean((string) ($_POST['message'] ?? ''), 5000);
+        $errors = [];
+        if ($name === '') {
+            $errors[] = 'Please enter your name.';
+        }
+        if (!Forms::emailOk($email)) {
+            $errors[] = 'Please enter a valid email address (like name@example.com) so I can reply.';
+        }
+        if (mb_strlen($msg) < 10) {
+            $errors[] = 'Please write a message of at least 10 characters.';
+        }
+        if (!$errors) {
+            $errors = Forms::guard('contact', 3, 60);
+            if ($errors === ['trap']) {
+                header('Location: /contact?sent=1', true, 303);   // robots get the same answer a person does
+                return;
+            }
+        }
+        if ($errors) {
+            $this->form = ['errors' => $errors, 'old' => ['name' => $name, 'email' => $email, 'message' => $msg]];
+            http_response_code(422);
+            $this->contactPage();
+            return;
+        }
+        Db::pdo()->prepare('INSERT INTO contact_messages (name, email, body, ip_hash, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP())')
+            ->execute([$name, $email, $msg, Forms::ipHash()]);
+        $this->notifyOwner('New message from ' . $name, "From: $name <$email>\n\n$msg\n", $email);
+        header('Location: /contact?sent=1', true, 303);
+    }
+
+    private function commentSubmit(): void
+    {
+        $pdo = Db::pdo();
+        $st = $pdo->prepare('SELECT s.id, s.slug, s.legacy_path, s.title FROM stories s WHERE s.id = ? AND ' . self::LIVE);
+        $st->execute([(int) ($_POST['story_id'] ?? 0)]);
+        $story = $st->fetch();
+        if (!$story) {
+            $this->notFound();
+            return;
+        }
+        $name = $this->clean((string) ($_POST['name'] ?? ''), 80);
+        $email = $this->clean((string) ($_POST['email'] ?? ''), 190);
+        $text = $this->clean((string) ($_POST['comment'] ?? ''), 3000);
+        $errors = [];
+        if (mb_strlen($text) < 2) {
+            $errors[] = 'Please write a comment.';
+        }
+        if ($email !== '' && !Forms::emailOk($email)) {
+            $errors[] = 'That email address does not look right (or leave it blank).';
+        }
+        if (preg_match_all('#https?://|www\.#i', $text) > 2) {
+            $errors[] = 'Comments can include up to two links.';
+        }
+        if (!$errors) {
+            $errors = Forms::guard('comment', 5, 60);
+            if ($errors === ['trap']) {
+                header('Location: ' . story_url($story) . '?comment=pending#comments', true, 303);
+                return;
+            }
+        }
+        $back = $story['legacy_path'] ?: null;
+        if ($errors) {
+            $this->form = ['errors' => $errors, 'old' => ['name' => $name, 'email' => $email, 'comment' => $text]];
+            http_response_code(422);
+            $this->story($back ? 'legacy_path' : 'slug', $back ?: $story['slug']);
+            return;
+        }
+        $paras = array_filter(preg_split('/\n{2,}/', str_replace("\r", '', $text)) ?: []);
+        $html = implode("\n", array_map(fn($p) => '<p>' . nl2br(e(trim($p))) . '</p>', $paras));
+        $pdo->prepare('INSERT INTO comments_archive (story_id, author, author_email, body_html, status, commented_at, created_at, source_id, ip_hash) VALUES (?, ?, ?, ?, "pending", UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?, ?)')
+            ->execute([$story['id'], $name, $email, $html, 'site:' . bin2hex(random_bytes(8)), Forms::ipHash()]);
+        $this->notifyOwner('Comment waiting on ' . $story['title'], ($name !== '' ? $name : 'Anonymous') . " wrote:\n\n$text\n\nApprove or delete it in the admin Inbox.\n", $email);
+        header('Location: ' . story_url($story) . '?comment=pending#comments', true, 303);
+    }
+
     private function renderPage(?array $p): void
     {
         if (!$p) {
@@ -501,7 +612,7 @@ final class Site
         }
         $path = $p['legacy_path'] ?: '/' . $p['slug'];
         $has = fn(string $slug) => (bool) Db::pdo()->query('SELECT 1 FROM pages WHERE status = "published" AND slug = ' . Db::pdo()->quote($slug))->fetchColumn();
-        $this->send('page', ['p' => $p, 'isAbout' => str_starts_with($p['slug'], 'about'), 'hasContact' => $has('contact'), 'hasBooks' => (bool) Db::pdo()->query('SELECT 1 FROM books WHERE status = "published" LIMIT 1')->fetchColumn()], [
+        $this->send('page', ['form' => $this->form, 'p' => $p, 'isAbout' => str_starts_with($p['slug'], 'about'), 'hasContact' => $has('contact'), 'hasBooks' => (bool) Db::pdo()->query('SELECT 1 FROM books WHERE status = "published" LIMIT 1')->fetchColumn()], [
             'title' => $p['title'] . ' | ' . setting('site_title'),
             'description' => $p['summary'] !== '' ? $p['summary'] : excerpt($p['body_html']),
             'canonical' => site_url($path),
@@ -554,7 +665,7 @@ final class Site
         foreach ($pdo->query('SELECT slug FROM series') as $t) {
             $urls[] = [site_url('/series/' . $t['slug']), null];
         }
-        foreach ($pdo->query('SELECT slug FROM tags') as $t) {
+        foreach ($pdo->query('SELECT slug FROM tags WHERE hidden = 0') as $t) {
             $urls[] = [site_url('/tag/' . $t['slug']), null];
         }
         foreach ($pdo->query('SELECT slug, legacy_path, updated_at FROM pages WHERE status = "published"') as $p) {
@@ -605,8 +716,8 @@ final class Site
     /** @return list<array{slug:string,name:string}> */
     private function topTags(): array
     {
-        return Db::pdo()->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 ORDER BY t.sort_order, t.name LIMIT 3')->fetchAll()
-            ?: Db::pdo()->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' GROUP BY t.id ORDER BY n DESC LIMIT 3')->fetchAll();
+        return Db::pdo()->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 ORDER BY t.sort_order, t.name LIMIT 3')->fetchAll()
+            ?: Db::pdo()->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 GROUP BY t.id ORDER BY n DESC LIMIT 3')->fetchAll();
     }
 
     private function notFound(): void

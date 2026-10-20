@@ -225,3 +225,16 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .pager-jump{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.5rem;font:.95rem var(--sans)}
 .pager-jump input{width:5.5rem}
 .pager .btn{gap:.35rem}
+
+/* Forms: contact and comments */
+.hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.stack .field{margin-bottom:1.1rem}
+.stack label{display:block;font:1rem var(--sans);margin-bottom:.35rem}
+.stack textarea{width:100%;max-width:46rem;min-height:8rem;font:1rem/1.6 var(--serif)}
+.stack input[type=text],.stack input[type=email]{max-width:46rem}
+.req{color:var(--rose);font-size:.875rem}
+.notice{border:1px solid var(--line);background:var(--panel);padding:1rem 1.25rem;margin:0 0 1.25rem;font:1rem var(--sans);max-width:46rem}
+.notice.bad{border-color:#d4687f}
+.notice ul{margin:.5rem 0 0 1.25rem;padding:0}
+.turnstile-wrap{margin:.5rem 0 1rem}
+.comment-form{max-width:46rem;margin-top:2rem}

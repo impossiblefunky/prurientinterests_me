@@ -36,4 +36,18 @@ if ($from && $to) {
 if ($to) {
     $pdo->prepare("UPDATE tags SET name = 'BDSM terminology' WHERE id = ? AND name <> 'BDSM terminology'")->execute([$to]);
 }
+
+// Second round (Mike, 2026-10-20): "Golden" is Mistress Golden; label-type tags are hidden from the public Interests list;
+// the very small tags (Kitty, Desires, Karma, Bully) are dropped. Stories keep everything else; old tag addresses go to /tags.
+$pdo->prepare("UPDATE tags SET name = 'Mistress Golden' WHERE slug = 'golden' AND BINARY name <> 'Mistress Golden'")->execute();
+foreach (['life', 'site', 'news', 'media', 'book', 'review'] as $slug) {
+    $pdo->prepare('UPDATE tags SET hidden = 1 WHERE slug = ?')->execute([$slug]);
+}
+$redir = $pdo->prepare("INSERT IGNORE INTO redirects (from_path, to_url, code, created_at) VALUES (?, '/tags', 301, UTC_TIMESTAMP())");
+foreach (['kitty', 'desires', 'karma', 'bully'] as $slug) {
+    if ($pdo->prepare('DELETE FROM tags WHERE slug = ?')->execute([$slug])) {
+        $redir->execute(['/tag/' . $slug]);
+    }
+}
+echo "Tags tidied (renamed, hidden, dropped).\n";
 echo "Done.\n";

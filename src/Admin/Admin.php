@@ -180,7 +180,7 @@ final class Admin
             ],
             'tags' => [
                 'group' => 'Interests', 'label' => 'Tags', 'singular' => 'tag', 'table' => 'tags', 'order' => 'name', 'aliases' => true, 'merge' => true,
-                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'uses' => 'Uses', 'featured' => 'Featured'],
+                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'uses' => 'Uses', 'featured' => 'Featured', 'hidden' => 'Hidden'],
                 'list_sql' => 'SELECT t.*, (SELECT COUNT(*) FROM item_tags i WHERE i.tag_id = t.id) AS uses FROM tags t',
                 'fields' => [
                     ['name', 'Canonical tag (public name)', 'text', 'required' => true, 'max' => 120],
@@ -188,6 +188,7 @@ final class Admin
                     ['description', 'Description', 'textarea', 'max' => 500, 'rows' => 3, 'help' => 'Shown at the top of the tag page.'],
                     ['aliases', 'Tag aliases / imported Blogger labels', 'aliases', 'help' => 'Other spellings that should lead here, separated by commas. Old tag addresses keep working through redirects.'],
                     ['featured', 'Homepage featured interest', 'checkbox'],
+                    ['hidden', 'Hide from the public Interests list', 'checkbox', 'help' => 'The tag page still works if someone has the address, but the tag is not listed or shown on stories.'],
                     ['sort_order', 'Order among featured interests', 'number'],
                 ],
             ],
@@ -223,6 +224,8 @@ final class Admin
             header('Location: /admin/login', true, 302);
         } elseif ($res === 'settings') {
             $this->settings($method);
+        } elseif ($res === 'inbox') {
+            $this->inbox($method, array_slice($parts, 1));
         } elseif (isset($this->resources()[$res])) {
             $this->resource($res, $method, array_slice($parts, 1));
         } else {
@@ -280,6 +283,9 @@ final class Admin
     {
         $names = ['site_title' => 'Site title', 'author_name' => 'Pen name (shown on stories and books)', 'tagline' => 'Tagline', 'home_eyebrow' => 'Homepage small heading',
             'home_headline' => 'Homepage headline', 'home_intro' => 'Homepage introduction', 'footer_note' => 'Footer note',
+            'contact_email' => 'Email address that receives contact messages and comment notices',
+            'turnstile_site_key' => 'Cloudflare Turnstile site key (the public one)',
+            'turnstile_secret_key' => 'Cloudflare Turnstile secret key (kept private; leave blank to keep the current one)',
             'google_site_verification' => 'Google Search Console verification code (just the code from the meta tag)'];
         $errors = [];
         if ($method === 'POST') {
@@ -291,9 +297,15 @@ final class Admin
                 $names[$n] = $label;
                 $_POST[$n] = $v;
             }
+            if ($_POST['contact_email'] !== '' && !\App\Web\Forms::emailOk($_POST['contact_email'])) {
+                $errors[] = 'The contact email address does not look right.';
+            }
             if (!$errors) {
                 $st = $this->pdo->prepare('INSERT INTO settings (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)');
                 foreach (array_keys($names) as $n) {
+                    if ($n === 'turnstile_secret_key' && $_POST[$n] === '') {
+                        continue;   // blank means "keep the one already saved"
+                    }
                     $st->execute([$n, $_POST[$n]]);
                 }
                 $this->flash('Settings saved.');
@@ -302,7 +314,7 @@ final class Admin
             }
         }
         $values = $this->pdo->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
-        $this->page('Settings', View::partial('admin/settings', ['names' => $names, 'values' => $method === 'POST' ? $_POST : $values, 'errors' => $errors, 'csrf' => Auth::csrf()]));
+        $this->page('Settings', View::partial('admin/settings', ['names' => $names, 'values' => ($method === 'POST' ? $_POST : $values) + ['turnstile_secret_saved' => ($values['turnstile_secret_key'] ?? '') !== '' ? '1' : ''], 'errors' => $errors, 'csrf' => Auth::csrf()]));
     }
 
     /** @param list<string> $rest */
@@ -904,11 +916,50 @@ final class Admin
         $this->page('Duplicate images', View::partial('admin/duplicates', ['groups' => $groups, 'waiting' => $waiting, 'csrf' => Auth::csrf()]));
     }
 
+    /** Comments waiting for approval and messages from the contact form. */
+    private function inbox(string $method, array $rest): void
+    {
+        if ($method === 'POST') {
+            [$kind, $id, $do] = array_pad($rest, 3, '');
+            $id = (int) $id;
+            if ($kind === 'comment' && $id) {
+                if ($do === 'approve') {
+                    $this->pdo->prepare('UPDATE comments_archive SET status = "LIVE" WHERE id = ?')->execute([$id]);
+                    $this->flash('Comment approved. It is now visible.');
+                } elseif ($do === 'delete') {
+                    $this->pdo->prepare('DELETE FROM comments_archive WHERE id = ? AND source_id LIKE "site:%"')->execute([$id]);   // only comments left on this site, never the imported ones
+                    $this->flash('Comment deleted.');
+                }
+            } elseif ($kind === 'message' && $id) {
+                if ($do === 'read') {
+                    $this->pdo->prepare('UPDATE contact_messages SET status = "read" WHERE id = ?')->execute([$id]);
+                } elseif ($do === 'delete') {
+                    $this->pdo->prepare('DELETE FROM contact_messages WHERE id = ?')->execute([$id]);
+                    $this->flash('Message deleted.');
+                }
+            }
+            header('Location: /admin/inbox', true, 303);
+            return;
+        }
+        $comments = $this->pdo->query('SELECT c.id, c.author, c.author_email, c.body_html, c.commented_at, s.title AS story FROM comments_archive c LEFT JOIN stories s ON s.id = c.story_id WHERE c.status = "pending" ORDER BY c.commented_at')->fetchAll();
+        $messages = $this->pdo->query('SELECT * FROM contact_messages ORDER BY (status = "new") DESC, created_at DESC LIMIT 100')->fetchAll();
+        $this->page('Inbox', View::partial('admin/inbox', ['comments' => $comments, 'messages' => $messages, 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
+    }
+
+    private function inboxCount(): int
+    {
+        try {
+            return (int) $this->pdo->query('SELECT (SELECT COUNT(*) FROM comments_archive WHERE status = "pending") + (SELECT COUNT(*) FROM contact_messages WHERE status = "new")')->fetchColumn();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
     private function page(string $title, string $body): void
     {
         $flash = $_SESSION['flash'] ?? '';
         unset($_SESSION['flash']);
         header('Content-Type: text/html; charset=utf-8');
-        echo View::partial('admin/layout', ['title' => $title, 'body' => $body, 'flash' => $flash, 'csrf' => Auth::csrf(), 'user' => Auth::user(), 'resources' => $this->resources()]);
+        echo View::partial('admin/layout', ['title' => $title, 'body' => $body, 'flash' => $flash, 'csrf' => Auth::csrf(), 'user' => Auth::user(), 'resources' => $this->resources(), 'inbox' => $this->inboxCount()]);
     }
 }
