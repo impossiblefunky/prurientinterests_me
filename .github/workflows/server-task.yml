@@ -33,6 +33,8 @@ on:
           - check-links
           - retire-sugasm-preview
           - retire-sugasm
+          - retire-elust-preview
+          - retire-elust
           - apply-alt-text-preview
           - apply-alt-text
           - add-amazon-books
@@ -142,6 +144,10 @@ jobs:
               remote "\$PHP bin/add-amazon-books.php" ;;
             retire-sugasm-preview)
               remote "\$PHP bin/retire-sugasm.php --preview" ;;
+            retire-elust-preview)
+              remote "\$PHP bin/retire-sugasm.php --like=elust --preview" ;;
+            retire-elust)
+              remote "\$PHP bin/retire-sugasm.php --like=elust" ;;
             retire-sugasm)
               remote "\$PHP bin/retire-sugasm.php" ;;
             check-links)
