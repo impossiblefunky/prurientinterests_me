@@ -168,3 +168,16 @@ html.paper mark{background:#f2d27a;color:#241b20}
 /* Comments carried over from the old blog */
 .comments .comment { border-top: 1px solid var(--line, rgba(214, 140, 160, .35)); padding: 1rem 0; max-width: 46rem; }
 .comments .comment .meta { margin: 0 0 .4rem; }
+
+/* Gallery viewer */
+.viewer{border:0;padding:0;background:rgba(10,8,11,.96);color:var(--text);width:100vw;height:100vh;max-width:none;max-height:none}
+.viewer::backdrop{background:rgba(0,0,0,.85)}
+.viewer[open]{display:flex;flex-direction:column}
+.viewer-bar{display:flex;justify-content:space-between;align-items:center;padding:.5rem 1rem;font:1rem var(--sans);color:var(--muted)}
+.viewer-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:.75rem;padding:0 .75rem 1rem}
+.viewer figure{margin:0;flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem}
+.viewer img{max-width:100%;max-height:calc(100vh - 11rem);object-fit:contain;display:block}
+.viewer figcaption{font:1rem var(--serif);text-align:center;max-width:46rem}
+.viewer-prev,.viewer-next{min-width:44px;min-height:44px;font-size:1.4rem}
+@media (max-width:40rem){.viewer-stage{flex-wrap:wrap;align-content:center}.viewer figure{order:-1;flex-basis:100%;height:auto}.viewer img{max-height:calc(100vh - 14rem)}}
+@media (prefers-reduced-motion:no-preference){.viewer[open]{animation:vfade .15s ease-out}@keyframes vfade{from{opacity:0}to{opacity:1}}}
