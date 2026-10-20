@@ -29,6 +29,31 @@ foreach ($titles as $i => $t) {
     $added++;
 }
 
+// Details copied from each book's Amazon page (blurb, ASIN, publication date, length). No prices.
+$details = [
+    'meeting-max' => ['B00KZAP0Q4', '2014-06-13', 15, ['A submissive man meets up with an Dominant Male (and his female friend) and gets more than he bargained for.']],
+    'the-girl-in-the-mirror' => ['B00HT73QQC', '2014-01-10', 7, ['Adult Reading. I played it very slow with Sally. I relished the process of learning about her passions and her limits. This is the tale of the first time I used her bottom for my own purposes.']],
+    'the-other-man' => ['B00C3N72E4', '2013-03-28', 16, ['Adult Material.', 'I\'m that guy. Some people call me "the other man." Others call me "Bull." I prefer to go by my real name, Eduardo.', 'I\'m the guy who, in the stories, is always in the bedroom with the wife or girlfriend getting it on in the afternoon when the husband or boyfriend comes home early from work.']],
+    'dollar-store-domme' => ['B00BTR03Z0', '2013-03-13', 9, ['This girl likes her toys. I\'ve spent two decades amassing a very respectable collection. I keep several suitcases and duffel bags packed and waiting at all times. I\'ve got them at home, in my car, even one at work; each stocked with basic tools of my trade along with some personal favorites. I supplement these with additional toys depending on the client, of course.', 'Imagine my dismay when I arrive in Detroit for a special session with one of my old regulars only to find that the airline sent my bags back to Philadelphia, giving them a round trip without a stop in between. If you can\'t imagine it, you\'ll just have to trust me. I\'m freaking out.']],
+    'doing-the-chores' => ['B00BLFD370', '2013-02-25', 10, ['I thought moving back home after college was the most humiliating thing that had happened to me but that would pale in comparison to what occurred next.', 'I had spent the summer on my own in an apartment, barely eking out a living at a minimum wage job while sending out letters of inquiry to anything even remotely related to my major. I finally managed to find an internship and, as it was unpaid, I knew I couldn\'t support myself. Thus, the move back home with my mom and my step-dad, Jerry.']],
+    'class-reunion' => ['B00BJEBLOK', '2013-02-21', 13, ['When visiting a class reunion, a past love is rekindled and old secrets are revealed.']],
+    'satin-met-a-laddie' => ['B00BIW8MF4', '2013-02-20', 8, ['Satin unlocked in him something buried deep inside. The silky touch of that wondrous material made his skin sing and his nerves burn with delightful yearning.'], '978-1301430246'],
+    'doctor-s-orders' => ['B00B6WUEJ8', '2013-01-27', 9, ['A man goes to a specialist about his apparent sterility for a very interesting assessment.']],
+];
+$upBook = $pdo->prepare("UPDATE books SET description_html = ?, subtitle = ?, published_on = ?, updated_at = UTC_TIMESTAMP() WHERE slug = ? AND description_html = ''");
+$upEd = $pdo->prepare("UPDATE book_editions SET purchase_url = ?, isbn = ? WHERE book_id = ? AND name = 'Kindle Edition' AND purchase_url = ?");
+$filled = 0;
+foreach ($details as $slug => $d) {
+    $html = implode("\n", array_map(fn($p) => '<p>' . htmlspecialchars($p, ENT_NOQUOTES) . '</p>', $d[3]));
+    $upBook->execute([$html, 'Kindle story · ' . $d[2] . ' pages', $d[1], $slug]);
+    $find->execute([$slug]);
+    $bid = (int) $find->fetchColumn();
+    if ($bid) {
+        $upEd->execute(['https://www.amazon.com/dp/' . $d[0], $d[4] ?? '', $bid, AUTHOR_PAGE]);
+        $filled += $upEd->rowCount();
+    }
+}
+
 // Kindle links Mike supplied for the two books that already exist (kept exactly as given).
 $kindle = ['freedom-is-slavery' => 'https://amzn.to/4eHrV3P', 'life-on-my-knees' => 'https://amzn.to/4enhSRn'];
 $has = $pdo->prepare('SELECT 1 FROM book_editions WHERE book_id = ? AND purchase_url = ?');
@@ -55,4 +80,4 @@ foreach ($kindle as $slug => $url) {
         $linked++;
     }
 }
-echo "$added books added, $linked Kindle links added.\n";
+echo "$added books added, $linked Kindle links added, $filled product links set.\n";
