@@ -88,7 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           # DreamHost's plain `php` on the command line is older than the one the website uses, so pick 8.3 explicitly.
-          remote() { ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=\$( for c in /usr/local/php84/bin/php /usr/local/php83/bin/php; do [ -x \$c ] && echo \$c && break; done ); [ -n \"\$PHP\" ] || { echo 'PHP 8.3 was not found on the server'; exit 1; }; $1"; }
+          remote() { ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=\$( for c in /usr/local/php83/bin/php /usr/local/php84/bin/php; do [ -x \$c ] && echo \$c && break; done ); [ -n \"\$PHP\" ] || { echo 'PHP 8.3 was not found on the server'; exit 1; }; $1"; }
           case "$TASK" in
             check)
               remote "echo 'Connected as' \$(whoami) 'in' \$(pwd); echo 'Using PHP:' \$PHP; \$PHP -v | head -1; echo 'Plain php:' \$(php -v | head -1); ls -1 | head -20; test -f .env && echo '.env: present' || echo '.env: MISSING (run write-env)'; echo 'Database tools:'; \$PHP -m | grep -i -E 'pdo_mysql|mbstring|dom|gd|zip|xml' | tr '\n' ' '; echo" ;;
@@ -103,7 +103,7 @@ jobs:
               remote "\$PHP bin/migrate.php" ;;
             create-admin)
               [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] || { echo "::error::Fill in admin_email and add the GitHub secret ADMIN_PASSWORD (12+ characters)."; exit 1; }
-              printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=/usr/local/php83/bin/php; [ -x /usr/local/php84/bin/php ] && PHP=/usr/local/php84/bin/php; \$PHP bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
+              printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && PHP=/usr/local/php84/bin/php; [ -x /usr/local/php83/bin/php ] && PHP=/usr/local/php83/bin/php; \$PHP bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
               echo "Now delete the ADMIN_PASSWORD secret from GitHub." ;;
             import-blogger-dry-run)
               remote "\$PHP bin/import-blogger.php storage/import/feed.atom --dry-run" ;;

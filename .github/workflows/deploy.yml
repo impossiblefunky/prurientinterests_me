@@ -67,7 +67,7 @@ jobs:
           cd '${{ secrets.DH_PATH }}'
           # The website runs PHP 8.3 but DreamHost's plain `php` command is older, so use the 8.3 program explicitly.
           PHP=""
-          for c in /usr/local/php84/bin/php /usr/local/php83/bin/php; do [ -x "$c" ] && PHP="$c" && break; done
+          for c in /usr/local/php83/bin/php /usr/local/php84/bin/php; do [ -x "$c" ] && PHP="$c" && break; done
           [ -n "$PHP" ] || { echo "PHP 8.3 was not found on the server"; exit 1; }
           echo "Using $($PHP -v | head -1)"
           mkdir -p storage/logs storage/cache storage/sessions storage/import storage/reports public/uploads
