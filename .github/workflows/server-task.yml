@@ -31,6 +31,8 @@ on:
           - publish-images
           - tidy-content
           - check-links
+          - retire-sugasm-preview
+          - retire-sugasm
           - apply-alt-text-preview
           - apply-alt-text
           - add-amazon-books
@@ -138,6 +140,10 @@ jobs:
               remote "\$PHP bin/make-series.php --preview" ;;
             add-amazon-books)
               remote "\$PHP bin/add-amazon-books.php" ;;
+            retire-sugasm-preview)
+              remote "\$PHP bin/retire-sugasm.php --preview" ;;
+            retire-sugasm)
+              remote "\$PHP bin/retire-sugasm.php" ;;
             check-links)
               remote "\$PHP bin/check-links.php" ;;
             tidy-content)
