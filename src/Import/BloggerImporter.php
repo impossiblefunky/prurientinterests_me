@@ -48,8 +48,9 @@ final class BloggerImporter
         foreach ($comments as $c) {
             if (in_array($c['status'], ['SPAM_COMMENT', 'GHOSTED_COMMENT'], true)) { $this->counts['skipped']++; continue; }
             if ($this->dryRun) { $this->counts['comments']++; continue; }
-            $this->pdo->prepare('INSERT INTO comments_archive (story_id, author, body_html, status, commented_at, source_id) SELECT ?,?,?,?,?,? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM comments_archive WHERE source_id = ?)')
-                ->execute([$storyIdByAtom[$c['in_reply_to']] ?? null, $c['author'], HtmlSanitizer::clean($c['content']), $c['status'], $this->utc($c['published']), $c['id'], $c['id']]);
+            // A comment's post is named by blogger:parent (blogger:inReplyTo is only set for replies to other comments).
+            $this->pdo->prepare('INSERT INTO comments_archive (story_id, author, body_html, status, commented_at, source_id) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE story_id = VALUES(story_id), author = VALUES(author), body_html = VALUES(body_html), commented_at = VALUES(commented_at)')
+                ->execute([$storyIdByAtom[$c['parent']] ?? null, $c['author'], HtmlSanitizer::clean($c['content']), $c['status'], $this->utc($c['published']), $c['id']]);
             $this->counts['comments']++;
         }
     }
@@ -74,11 +75,13 @@ final class BloggerImporter
         $st = $this->pdo->prepare('SELECT id FROM stories WHERE source = "blogger" AND source_id = ?');
         $st->execute([$e['id']]);
         $id = $st->fetchColumn();
-        $vals = [$title, $body, $isLive ? 'published' : 'draft', $published, $e['author'], $words, $legacy, trim($e['meta']), $e['content'], $this->utc($e['updated']) ?? $now];
+        $kind = self::kindOf($e['labels'], $words, $body);
+        $this->counts['kind_' . $kind] = ($this->counts['kind_' . $kind] ?? 0) + 1;
+        $vals = [$title, $body, $isLive ? 'published' : 'draft', $published, $e['author'], $words, $legacy, trim($e['meta']), $e['content'], $this->utc($e['updated']) ?? $now, $kind];
         if ($id) {
-            $this->pdo->prepare('UPDATE stories SET title=?, body_html=?, status=?, published_at=?, author=?, word_count=?, legacy_path=?, summary=?, source_html=?, updated_at=? WHERE id=?')->execute([...$vals, $id]);
+            $this->pdo->prepare('UPDATE stories SET title=?, body_html=?, status=?, published_at=?, author=?, word_count=?, legacy_path=?, summary=?, source_html=?, updated_at=?, kind=? WHERE id=?')->execute([...$vals, $id]);
         } else {
-            $this->pdo->prepare('INSERT INTO stories (title, body_html, status, published_at, author, word_count, legacy_path, summary, source_html, updated_at, slug, source, source_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,"blogger",?,?)')
+            $this->pdo->prepare('INSERT INTO stories (title, body_html, status, published_at, author, word_count, legacy_path, summary, source_html, updated_at, kind, slug, source, source_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,"blogger",?,?)')
                 ->execute([...$vals, $this->uniqueSlug('stories', $slug), $e['id'], $now]);
             $id = $this->pdo->lastInsertId();
         }
@@ -121,6 +124,20 @@ final class BloggerImporter
             }
             $this->pdo->prepare('INSERT IGNORE INTO item_tags (tag_id, item_type, item_id) VALUES (?,?,?)')->execute([$tagId, 'story', $storyId]);
         }
+    }
+
+    /**
+     * Guesses a post's type from its Blogger labels and length: written pieces are 'story' (tagged story) or 'post';
+     * mostly-pictures posts are 'picture'; YouTube posts are 'video'. Mike can change any of them in the CMS.
+     * @param list<string> $labels
+     */
+    public static function kindOf(array $labels, int $words, string $body): string
+    {
+        $l = array_map('mb_strtolower', $labels);
+        if (in_array('story', $l, true) && $words >= 150) { return 'story'; }
+        if (in_array('youtube', $l, true) && $words < 150) { return 'video'; }
+        if ($words < 60 && preg_match('/<img\b/i', $body)) { return 'picture'; }
+        return $words >= 400 ? 'story' : 'post';
     }
 
     /** Blogger separates paragraphs with <br><br>; turn that into real <p> elements. */

@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Compares a Word document with the stories already in the database (the blog is the master copy). READ-ONLY.
  *   php bin/compare-docx.php storage/import/confessions.docx --split
  *   php bin/compare-docx.php storage/import/story.doc.docx --title "Exact story title"
- * Writes storage/reports/docx-compare.md: for each piece, whether it matches a story and every difference,
+ * Writes storage/reports/docx-compare-<file name>.md: for each piece, whether it matches a story and every difference,
  * sorted into "spelling or punctuation only" and "wording changed" so you can see where the Word file was edited.
  */
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -29,20 +29,33 @@ $stories = [];
 foreach (Db::pdo()->query('SELECT id, title, status, body_html FROM stories') as $s) {
     $stories[DocxImporter::normalizeTitle($s['title'])][] = $s;
 }
+$probe = fn(string $html) => implode(' ', array_slice(preg_split('/\s+/u', preg_replace('/[^a-z0-9 ]+/', '', mb_strtolower(Spelling::visibleText($html))), -1, PREG_SPLIT_NO_EMPTY) ?: [], 0, 10));
+$allStories = Db::pdo()->query('SELECT id, title, status, body_html FROM stories')->fetchAll();
 $tokens = fn(string $html) => preg_split('/\s+/u', Spelling::visibleText($html), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 $wordKey = fn(string $t) => mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $t) ?? '');
 
 $report = '';
-$summary = ['identical' => 0, 'spelling_only' => 0, 'wording_changed' => 0, 'no_match' => 0];
+$summary = ['identical' => 0, 'identical_text' => 0, 'title_differs' => 0, 'spelling_only' => 0, 'wording_changed' => 0, 'no_match' => 0];
 $unmatched = [];
 foreach ($pieces as $p) {
     $key = DocxImporter::normalizeTitle($p['title']);
     $match = $stories[$key][0] ?? null;
+    $byOpening = false;
+    if (!$match && trim($p['html']) !== '') {
+        // Titles may have been changed in the Word file: fall back to the first ten words of the text.
+        $needle = $probe($p['html']);
+        foreach ($allStories as $cand) {
+            if ($needle !== '' && $probe($cand['body_html']) === $needle) { $match = $cand; $byOpening = true; break; }
+        }
+    }
     if (!$match) { $summary['no_match']++; $unmatched[] = $p['title']; continue; }
     $blog = $tokens($match['body_html']);
     $word = $tokens($p['html']);
     $diffs = diffWords($blog, $word);
-    if (!$diffs) { $summary['identical']++; continue; }
+    $titleNote = $byOpening ? "\n**Title differs.** Blog: “{$match['title']}” · Word file: “{$p['title']}”\n" : '';
+    if ($byOpening) { $summary['title_differs']++; }
+    if (!$diffs && !$byOpening) { $summary['identical']++; continue; }
+    if (!$diffs) { $summary['identical_text']++; $report .= "\n## {$match['title']}\n$titleNote\nText identical.\n"; continue; }
     $spell = $wording = [];
     foreach ($diffs as $d) {
         $a = implode(' ', $d['blog']);
@@ -54,16 +67,17 @@ foreach ($pieces as $p) {
         if ($small) { $spell[] = $line; } else { $wording[] = $line; }
     }
     $summary[$wording ? 'wording_changed' : 'spelling_only']++;
-    $report .= "\n## {$match['title']}\n\nBlog: " . count($blog) . " words · Word file: " . count($word) . " words\n";
+    $report .= "\n## {$match['title']}\n$titleNote\nBlog: " . count($blog) . " words · Word file: " . count($word) . " words\n";
     if ($wording) { $report .= "\n**Wording changed (" . count($wording) . ")**\n\n" . implode("\n", $wording) . "\n"; }
     if ($spell) { $report .= "\n**Spelling or punctuation (" . count($spell) . ")**\n\n" . implode("\n", $spell) . "\n"; }
 }
 $head = "# Word file vs. blog\n\nFile: " . basename($file) . "\nNothing has been changed. Left of the arrow is the BLOG text, right is the WORD file.\n\n"
-    . "| Result | Pieces |\n|---|---|\n| Identical | {$summary['identical']} |\n| Spelling or punctuation differences only | {$summary['spelling_only']} |\n| Wording differs | {$summary['wording_changed']} |\n| No story with that title in the database | {$summary['no_match']} |\n";
+    . "| Result | Pieces |\n|---|---|\n| Identical (title and text) | {$summary['identical']} |\n| Text identical but title differs | {$summary['identical_text']} |\n| Title differs (any text result) | {$summary['title_differs']} |\n| Spelling or punctuation differences only | {$summary['spelling_only']} |\n| Wording differs | {$summary['wording_changed']} |\n| No story with that title in the database | {$summary['no_match']} |\n";
 if ($unmatched) { $head .= "\nNo match for: " . implode('; ', $unmatched) . "\n"; }
 @mkdir(Env::root() . '/storage/reports', 0775, true);
-file_put_contents(Env::root() . '/storage/reports/docx-compare.md', $head . $report);
-echo json_encode($summary), "\nReport: storage/reports/docx-compare.md\n";
+$out = '/storage/reports/docx-compare-' . preg_replace('/[^a-z0-9]+/i', '-', pathinfo($file, PATHINFO_FILENAME)) . '.md';
+file_put_contents(Env::root() . $out, $head . $report);
+echo json_encode($summary), "\nReport: " . ltrim($out, '/') . "\n";
 
 /**
  * Word-level diff using the system `diff` (present on DreamHost and Linux/macOS). Compares letters only, ignoring case/punctuation.

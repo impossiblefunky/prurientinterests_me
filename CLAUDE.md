@@ -13,11 +13,22 @@ Public site + small CMS for Mike White's adult writing site, replacing the Blogg
 - Outside links: new tab, "(opens in a new tab)" for screen readers, never wrap the icon alone.
 - Owner is new to git, Composer and the terminal: explain unfamiliar terms briefly; give commands as single fenced `bash` blocks.
 
+## What the real data and the designs showed (2026-10-20)
+- Pen name **Louis Friend**; tagline **"My needs, my fantasies, my desires"**; a personal archive "since 2006". Public nav: Home, Interests (= tags), Stories, Gallery, Books, About. Footer: "Prurient Interests · Louis Friend".
+- Blogger feed: 1,163 live posts (2006-2026, ~260k words), 10 drafts, 4 pages (about-prurient-interests, contact, life-on-my-knees, freedom-is-slavery), 215 live comments (all link to posts via `blogger:parent`), 25 spam + 1 ghosted dropped, 47 labels, 1,207 images in post bodies (almost all on Google's servers).
+- Post types (`stories.kind`, guessed on import, editable): ~159 story, ~162 post, ~805 picture (image-only), ~47 video. **Decision pending from Mike:** how picture and video posts appear (keep every one at its old URL regardless).
+- The Takeout holds ~4,400 original images in `Albums/Prurient Interests` plus `Blogger Pictures`; they are the source for self-hosting.
+- Designs add features not built yet: **series with chapters** (Series, Chapter order, "Continue the series / Next chapter"), library filters (format: standalone/series; years), **tag pages mixing stories, images and books** (Everything/Stories/Images/Books), tags on books and images, **book editions** (edition name, price, purchase link, ISBN; "Read an excerpt"), **gallery albums** (album title/intro, cover image, source credit URL, creator credit, display order, feature on homepage), homepage controls (feature on homepage, section order, featured book, featured tags), tag aliases / canonical tag merge with redirects, reading page ("Paper reading mode", "Larger text", drop cap, original publication date), publish date shown in **Eastern time**, CMS sidebar "The writing desk" (Stories & posts, Pages & homepage, Media & galleries, Books).
+- Design palette: near-black plum background, cream serif headings (Georgia-style), rose accent text, wine-red primary buttons, thin rose borders, small caps eyebrow labels. Fonts are system serif/sans in the mockups.
+- Word-vs-blog comparison (confessions.docx, 36 pieces): 6 identical, 7 same text but different title, 12 spelling/punctuation only, 10 wording differs, 1 not found. All titles in the Word file may differ from the blog's. `story.doc.docx` matches a blog post by opening words (wording differs).
+- First spell check: 687 possible misspellings, 744 names to confirm, 234 doubled words. Reviewed proposals are in `docs/spelling-fixes.PROPOSED.tsv` and `docs/custom-dictionary.PROPOSED.txt` (NOT live until Mike approves and they are copied to the live files).
+
 ## Layout
 `public/` web root, `src/` classes (PSR-4 `App\`), `templates/`, `bin/` command-line jobs, `database/migrations/*.sql` (applied once each by `bin/migrate.php`), `storage/` (logs, sessions, never committed), `docs/`.
 
 ## Open items
-- Waiting on Mike: allow `*.dl.dropboxusercontent.com` in the cloud environment's Network access (or upload `feed.atom` and the 15 design JPGs to the repo). Then: dry-run the Blogger import, review counts, import, run spellcheck and compare-docx, restyle to the designs.
+- Done: designs and Takeout downloaded; Blogger import verified against a local test database; spell check and Word comparison run. Next: Mike's decisions on picture/video posts and on the proposed spelling fixes; then restyle to the designs and build series, albums, editions, tag pages.
+- Self-host images: copy from the Takeout Albums into `public/uploads/` and rewrite post image URLs (needs the Takeout on the machine that runs the import).
 - Apply the Claude Design handoff (typography, colors, layouts) to `public/assets/site.css` and `templates/`.
 - Run the Blogger import and report: counts, external images (download and self-host), comments (stored privately in `comments_archive`, not shown).
 - Decide the site `author` name shown in schema and cards; confirm tag names after import.

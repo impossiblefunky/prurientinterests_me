@@ -228,7 +228,7 @@ final class Site
             'breadcrumbs' => [['Stories', '/stories'], [$s['title'], story_url($s)]],
             'jsonld' => [['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => $s['title'], 'description' => $desc,
                 'datePublished' => gmdate('c', strtotime($s['published_at'] . ' UTC')), 'dateModified' => gmdate('c', strtotime($s['updated_at'] . ' UTC')),
-                'author' => ['@type' => 'Person', 'name' => $s['author'] !== '' ? $s['author'] : setting('site_title')],
+                'author' => ['@type' => 'Person', 'name' => $s['author'] !== '' ? $s['author'] : setting('author_name', setting('site_title'))],
                 'mainEntityOfPage' => $url, 'wordCount' => (int) $s['word_count'], 'isAccessibleForFree' => true,
                 'keywords' => implode(', ', array_column($tags, 'name'))]],
         ]);

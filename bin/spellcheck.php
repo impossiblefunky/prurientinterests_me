@@ -47,7 +47,7 @@ foreach (Db::pdo()->query($sql) as $s) {
         $u['count']++;
         $u['stories'][$s['id']] = $s['title'];
         if (count($u['ctx']) < 2) {
-            $pos = mb_strpos($text, $w);
+            $pos = preg_match('/(?<![\p{L}\p{M}])' . preg_quote($w, '/') . '(?![\p{L}\p{M}])/u', $text, $mm, PREG_OFFSET_CAPTURE) ? mb_strlen(substr($text, 0, $mm[0][1])) : 0;
             $u['ctx'][] = '…' . trim(mb_substr($text, max(0, $pos - 40), 90)) . '…';
         }
         unset($u);
