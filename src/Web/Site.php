@@ -51,16 +51,12 @@ final class Site
         }
         // Old Blogger story URLs, e.g. /2012/12/forbidden-fruit.html
         if (preg_match('#^/\d{4}/\d{2}/[^/]+\.html$#', $path)) {
-            $this->gateOpen() ? $this->story('legacy_path', $path) : $this->gate($path);
+            $this->story('legacy_path', $path);
             return;
         }
         $m = $this->router->match($method, $path);
         if ($m === null) {
             $this->notFound();
-            return;
-        }
-        if (!$this->gateOpen() && !$this->gateExempt($path)) {
-            $this->gate($path);
             return;
         }
         ($m[0])($m[1]);
@@ -73,10 +69,6 @@ final class Site
         return ($_COOKIE[self::GATE_COOKIE] ?? '') === '1';
     }
 
-    private function gateExempt(string $path): bool
-    {
-        return in_array($path, ['/robots.txt', '/enter', '/leave'], true);
-    }
 
     private function gate(string $returnTo): void
     {
@@ -297,10 +289,6 @@ final class Site
             $this->notFound();
             return;
         }
-        if (!$this->gateOpen()) {
-            $this->gate($value);
-            return;
-        }
         $tg = $pdo->prepare('SELECT t.slug, t.name FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE it.item_type = "story" AND it.item_id = ? ORDER BY t.name');
         $tg->execute([$s['id']]);
         $tags = $tg->fetchAll();
@@ -500,6 +488,11 @@ final class Site
     {
         header('Content-Type: text/html; charset=utf-8');
         header('Rating: RTA-5042-1996-1400-1577-RTA');
+        header('Vary: Cookie');
+        // Visitors without the age-gate cookie get the notice laid over the page; the page itself is served in full (and
+        // indexable) so search engines can read it. Only the notice's own page (a failed /enter) is hidden from search.
+        $d['gate'] = !$this->gateOpen() && empty($meta['bare']);
+        $d['gateReturn'] = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
         $d['nav'] = ['header' => $this->nav('header'), 'footer' => $this->nav('footer')];
         echo View::render($template, $d, $meta);
     }

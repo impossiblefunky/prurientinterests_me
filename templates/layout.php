@@ -35,7 +35,11 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php foreach ($jsonld as $j): ?><script type="application/ld+json"><?= json_encode($j, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
 <?php endforeach; ?>
 </head>
-<body<?= !empty($meta['bare']) ? ' class="bare"' : '' ?>>
+<body<?= !empty($meta['bare']) ? ' class="bare"' : (!empty($d['gate']) ? ' class="gated"' : '') ?>>
+<?php if (!empty($d['gate'])): ?>
+<div class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-h"><?php $return = $d['gateReturn']; $headingTag = 'h2'; include __DIR__ . '/partials/gate_form.php'; ?></div>
+<?php endif; ?>
+<div class="page"<?= !empty($d['gate']) ? ' inert="inert" aria-hidden="true"' : '' ?>>
 <a class="skip" href="#main">Skip to main content</a>
 <?php if (empty($meta['bare'])): ?>
 <header class="site-header">
@@ -66,6 +70,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
   </ul><p><?= e(setting('footer_note')) ?></p></nav>
 </footer>
 <?php endif; ?>
+</div>
 <script src="/assets/site.js" defer></script>
 </body>
 </html>
