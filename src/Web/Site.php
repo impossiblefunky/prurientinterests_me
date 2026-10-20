@@ -26,12 +26,14 @@ final class Site
         $r->get('/stories', fn() => $this->library());
         $r->get('/series/{slug}', fn(array $p) => $this->series($p['slug']));
         $r->get('/tags', fn() => $this->tags());
+        $r->get('/random', fn() => $this->randomStory());
         $r->get('/tag/{slug}', fn(array $p) => $this->tag($p['slug']));
         $r->get('/search/label/{label}', fn(array $p) => $this->oldLabel($p['label']));
         $r->get('/story/{slug}', fn(array $p) => $this->story('slug', $p['slug']));
         $r->get('/gallery', fn() => $this->gallery());
         $r->get('/search', fn() => $this->search());
         $r->get('/books', fn() => $this->books());
+        $r->get('/books/{slug}', fn(array $p) => $this->book($p['slug']));
         $r->get('/about', fn() => $this->page(['about', 'about-prurient-interests']));
         $r->get('/p/{file}', fn(array $p) => $this->legacyPage('/p/' . $p['file']));
         $r->get('/contact', fn() => $this->contactPage());
@@ -135,19 +137,34 @@ final class Site
     private function home(): void
     {
         $pdo = Db::pdo();
-        $picks = $pdo->query($this->listSql() . ' AND s.featured = 1 ORDER BY s.published_at DESC LIMIT 3')->fetchAll();
-        if (count($picks) < 3) {
-            $have = $picks ? implode(',', array_map(fn($p) => (int) $p['id'], $picks)) : '0';
-            $fill = $pdo->query($this->listSql() . " AND s.kind = 'story' AND s.id NOT IN ($have) ORDER BY s.published_at DESC LIMIT " . (3 - count($picks)))->fetchAll();
-            $picks = array_merge($picks, $fill);
+        // Three ways in: the newest story, one chosen from the older archive (changes daily), and a series.
+        $day = (int) gmdate('z') + 366 * (int) gmdate('Y');
+        $picks = [];
+        $recent = $pdo->query($this->listSql() . " AND s.kind = 'story' ORDER BY s.published_at DESC LIMIT 1")->fetch();
+        if ($recent) {
+            $recent['label'] = 'Newest';
+            $picks[] = $recent;
         }
-        $tags = $pdo->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 ORDER BY t.sort_order, t.name LIMIT 12')->fetchAll();
+        $skip = $recent ? (int) $recent['id'] : 0;
+        $older = $pdo->query($this->listSql() . " AND s.kind = 'story' AND s.id <> $skip AND s.published_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 YEAR) AND s.word_count >= 1500 ORDER BY RAND($day) LIMIT 1")->fetch();
+        if ($older) {
+            $older['label'] = 'From the archive · ' . gmdate('Y', strtotime($older['published_at'] . ' UTC'));
+            $picks[] = $older;
+        }
+        $have = implode(',', array_map(fn($p) => (int) $p['id'], $picks ?: [['id' => 0]]));
+        $ser = $pdo->query($this->listSql() . " AND s.series_id IS NOT NULL AND s.id NOT IN ($have) ORDER BY RAND($day + 7) LIMIT 1")->fetch();
+        if ($ser) {
+            $ser['label'] = 'A series';
+            $picks[] = $ser;
+        }
+        $yearCounts = $pdo->query('SELECT YEAR(s.published_at) y, COUNT(*) n FROM stories s WHERE ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' GROUP BY y ORDER BY y DESC')->fetchAll();
+        $tags = $pdo->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 AND t.kind = "subject" ORDER BY t.sort_order, t.name LIMIT 12')->fetchAll();
         if (!$tags) {
-            $tags = $pdo->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 GROUP BY t.id ORDER BY n DESC LIMIT 8')->fetchAll();
+            $tags = $pdo->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 AND t.kind = "subject" GROUP BY t.id ORDER BY n DESC LIMIT 8')->fetchAll();
         }
         $albums = $pdo->query('SELECT a.slug, a.title FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.featured DESC, a.sort_order, a.id LIMIT 3')->fetchAll();
         $book = $pdo->query('SELECT * FROM books WHERE status = "published" ORDER BY featured DESC, sort_order, id DESC LIMIT 1')->fetch() ?: null;
-        $this->send('home', ['picks' => $picks, 'tags' => $tags, 'albums' => $albums, 'book' => $book], [
+        $this->send('home', ['picks' => $picks, 'tags' => $tags, 'albums' => $albums, 'book' => $book, 'yearCounts' => $yearCounts], [
             'title' => setting('site_title') . ' | ' . setting('tagline'),
             'description' => setting('home_intro', setting('tagline')),
             'canonical' => site_url('/'),
@@ -218,19 +235,34 @@ final class Site
         ]);
     }
 
+    /** "Let chance choose": sends the visitor to a random published story. */
+    private function randomStory(): void
+    {
+        $row = Db::pdo()->query('SELECT s.slug, s.legacy_path, s.id FROM stories s WHERE ' . self::LIVE . " AND s.kind = 'story' AND s.word_count >= 300 ORDER BY RAND() LIMIT 1")->fetch();
+        if (!$row) {
+            $this->notFound();
+            return;
+        }
+        header('Cache-Control: no-store');
+        header('X-Robots-Tag: noindex');
+        header('Location: ' . story_url($row), true, 302);
+    }
+
     private function tags(): void
     {
         $pdo = Db::pdo();
-        $rows = $pdo->query('SELECT t.slug, t.name, t.description, t.featured,
+        $rows = $pdo->query('SELECT t.slug, t.name, t.description, t.featured, t.kind,
             (SELECT COUNT(*) FROM item_tags it JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE it.tag_id = t.id AND it.item_type = "story")
           + (SELECT COUNT(*) FROM item_tags it JOIN gallery_items g ON g.id = it.item_id AND g.status = "published" WHERE it.tag_id = t.id AND it.item_type = "gallery")
           + (SELECT COUNT(*) FROM item_tags it JOIN books b ON b.id = it.item_id AND b.status = "published" WHERE it.tag_id = t.id AND it.item_type = "book") AS n
             FROM tags t WHERE t.hidden = 0 ORDER BY t.name')->fetchAll();
         $rows = array_values(array_filter($rows, fn($r) => (int) $r['n'] > 0));
-        $featured = array_values(array_filter($rows, fn($r) => $r['featured']));
-        // Split the A-Z list into three balanced columns labelled by their first and last letters.
-        $cols = array_chunk($rows, max(1, (int) ceil(count($rows) / 3)));
-        $this->send('tags', ['featured' => $featured ?: array_slice($rows, 0, 8), 'cols' => $cols], [
+        $subjects = array_values(array_filter($rows, fn($r) => $r['kind'] === 'subject'));
+        $others = array_values(array_filter($rows, fn($r) => $r['kind'] !== 'subject'));
+        $featured = array_values(array_filter($subjects, fn($r) => $r['featured']));
+        // Split the A-Z list of subjects into three balanced columns labelled by their first and last letters.
+        $cols = array_chunk($subjects, max(1, (int) ceil(count($subjects) / 3)));
+        $this->send('tags', ['featured' => $featured ?: array_slice($subjects, 0, 8), 'cols' => $cols, 'others' => $others], [
             'title' => 'Interests | ' . setting('site_title'),
             'description' => 'One tag can lead across years of writing, pictures, and books.',
             'canonical' => site_url('/tags'),
@@ -459,24 +491,58 @@ final class Site
         ]);
     }
 
-    private function books(): void
+    /** @return list<array<string,mixed>> published books with their editions */
+    private function loadBooks(?string $slug = null): array
     {
         $pdo = Db::pdo();
-        $books = $pdo->query('SELECT * FROM books WHERE status = "published" ORDER BY sort_order, published_on DESC, id DESC')->fetchAll();
+        $st = $pdo->prepare('SELECT * FROM books WHERE status = "published"' . ($slug !== null ? ' AND slug = ?' : '') . ' ORDER BY sort_order, published_on DESC, id DESC');
+        $st->execute($slug !== null ? [$slug] : []);
+        $books = $st->fetchAll();
         foreach ($books as &$b) {
-            $st = $pdo->prepare('SELECT * FROM book_editions WHERE book_id = ? ORDER BY sort_order, id');
-            $st->execute([$b['id']]);
-            $b['editions'] = $st->fetchAll();
+            $ed = $pdo->prepare('SELECT * FROM book_editions WHERE book_id = ? ORDER BY sort_order, id');
+            $ed->execute([$b['id']]);
+            $b['editions'] = $ed->fetchAll();
         }
         unset($b);
+        return $books;
+    }
+
+    private function books(): void
+    {
+        $books = $this->loadBooks();
         $this->send('books', ['books' => $books, 'topTags' => $this->topTags()], [
             'title' => 'The bookshelf | ' . setting('site_title'),
             'description' => 'Books by ' . setting('author_name', setting('site_title')) . '.',
             'canonical' => site_url('/books'),
             'breadcrumbs' => [['Books', '/books']],
-            'jsonld' => array_map(fn(array $b) => ['@context' => 'https://schema.org', '@type' => 'Book', 'name' => $b['title'],
+            'jsonld' => [['@context' => 'https://schema.org', '@type' => 'CollectionPage', 'name' => 'The bookshelf', 'url' => site_url('/books'),
+                'hasPart' => array_map(fn(array $b) => ['@type' => 'Book', 'name' => $b['title'], 'url' => site_url('/books/' . $b['slug'])], $books)]],
+        ]);
+    }
+
+    private function book(string $slug): void
+    {
+        $all = $this->loadBooks();
+        $book = null;
+        foreach ($all as $b) {
+            if ($b['slug'] === $slug) {
+                $book = $b;
+            }
+        }
+        if (!$book) {
+            $this->notFound();
+            return;
+        }
+        $others = array_values(array_filter($all, fn($b) => $b['slug'] !== $slug));
+        $this->send('book', ['book' => $book, 'others' => array_slice($others, 0, 4)], [
+            'title' => $book['title'] . ' | Books | ' . setting('site_title'),
+            'description' => excerpt($book['description_html'], 155) ?: 'A book by ' . setting('author_name', setting('site_title')) . '.',
+            'canonical' => site_url('/books/' . $book['slug']),
+            'breadcrumbs' => [['Books', '/books'], [$book['title'], '/books/' . $book['slug']]],
+            'jsonld' => [['@context' => 'https://schema.org', '@type' => 'Book', 'name' => $book['title'],
                 'author' => ['@type' => 'Person', 'name' => setting('author_name', setting('site_title'))],
-                'description' => excerpt($b['description_html'], 300)] + ($b['isbn'] !== '' ? ['isbn' => $b['isbn']] : []), $books),
+                'description' => excerpt($book['description_html'], 300), 'url' => site_url('/books/' . $book['slug'])]
+                + ($book['isbn'] !== '' ? ['isbn' => $book['isbn']] : [])],
         ]);
     }
 
@@ -649,7 +715,7 @@ final class Site
     private function robots(): void
     {
         header('Content-Type: text/plain; charset=utf-8');
-        echo "User-agent: *\nDisallow: /admin\nDisallow: /enter\nDisallow: /leave\nAllow: /\n\nSitemap: " . site_url('/sitemap.xml') . "\n";
+        echo "User-agent: *\nDisallow: /admin\nDisallow: /enter\nDisallow: /leave\nDisallow: /random\nAllow: /\n\nSitemap: " . site_url('/sitemap.xml') . "\n";
     }
 
     private function sitemap(): void
@@ -667,6 +733,9 @@ final class Site
         }
         foreach ($pdo->query('SELECT slug FROM tags WHERE hidden = 0') as $t) {
             $urls[] = [site_url('/tag/' . $t['slug']), null];
+        }
+        foreach ($pdo->query('SELECT slug FROM books WHERE status = "published"') as $bk) {
+            $urls[] = [site_url('/books/' . $bk['slug']), null];
         }
         foreach ($pdo->query('SELECT slug, legacy_path, updated_at FROM pages WHERE status = "published"') as $p) {
             $urls[] = [site_url($p['legacy_path'] ?: '/' . $p['slug']), $p['updated_at']];
@@ -716,8 +785,8 @@ final class Site
     /** @return list<array{slug:string,name:string}> */
     private function topTags(): array
     {
-        return Db::pdo()->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 ORDER BY t.sort_order, t.name LIMIT 3')->fetchAll()
-            ?: Db::pdo()->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 GROUP BY t.id ORDER BY n DESC LIMIT 3')->fetchAll();
+        return Db::pdo()->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 AND t.kind = "subject" ORDER BY t.sort_order, t.name LIMIT 3')->fetchAll()
+            ?: Db::pdo()->query('SELECT t.slug, t.name, COUNT(*) n FROM tags t JOIN item_tags it ON it.tag_id = t.id AND it.item_type = "story" JOIN stories s ON s.id = it.item_id AND ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' WHERE t.hidden = 0 AND t.kind = "subject" GROUP BY t.id ORDER BY n DESC LIMIT 3')->fetchAll();
     }
 
     private function notFound(): void

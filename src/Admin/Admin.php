@@ -180,13 +180,14 @@ final class Admin
             ],
             'tags' => [
                 'group' => 'Interests', 'label' => 'Tags', 'singular' => 'tag', 'table' => 'tags', 'order' => 'name', 'aliases' => true, 'merge' => true,
-                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'uses' => 'Uses', 'featured' => 'Featured', 'hidden' => 'Hidden'],
+                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'kind' => 'Kind', 'uses' => 'Uses', 'featured' => 'Featured', 'hidden' => 'Hidden'],
                 'list_sql' => 'SELECT t.*, (SELECT COUNT(*) FROM item_tags i WHERE i.tag_id = t.id) AS uses FROM tags t',
                 'fields' => [
                     ['name', 'Canonical tag (public name)', 'text', 'required' => true, 'max' => 120],
                     ['slug', 'URL slug', 'text'],
                     ['description', 'Description', 'textarea', 'max' => 500, 'rows' => 3, 'help' => 'Shown at the top of the tag page.'],
                     ['aliases', 'Tag aliases / imported Blogger labels', 'aliases', 'help' => 'Other spellings that should lead here, separated by commas. Old tag addresses keep working through redirects.'],
+                    ['kind', 'What kind of tag is this?', 'select', 'options' => ['subject' => 'Subject (something a reader wants to explore)', 'format' => 'Format (Story, Pictures, Book)', 'source' => 'Source (another site or an old promotional label)'], 'help' => 'Only subjects are featured on the homepage; formats and sources are still listed, further down the Interests page.'],
                     ['featured', 'Homepage featured interest', 'checkbox'],
                     ['hidden', 'Hide from the public Interests list', 'checkbox', 'help' => 'The tag page still works if someone has the address, but the tag is not listed or shown on stories.'],
                     ['sort_order', 'Order among featured interests', 'number'],

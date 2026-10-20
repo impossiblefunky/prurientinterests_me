@@ -24,7 +24,7 @@ $showType = fn(string $t) => $type === 'everything' || $type === $t; ?>
 <?php endif; ?>
 <?php if ($showType('books') && $books): ?>
 <section class="band" aria-labelledby="t-books"><h2 id="t-books">Related books</h2>
-  <ul class="boxes"><?php foreach ($books as $b): ?><li><a href="/books#<?= e($b['slug']) ?>"><?= e($b['title']) ?></a></li><?php endforeach; ?></ul>
+  <ul class="boxes"><?php foreach ($books as $b): ?><li><a href="/books/<?= e($b['slug']) ?>"><?= e($b['title']) ?></a></li><?php endforeach; ?></ul>
   <p><a class="btn" href="/books">Visit the bookshelf &rarr;</a></p>
 </section>
 <?php endif; ?>

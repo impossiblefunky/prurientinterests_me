@@ -22,7 +22,7 @@ $nothing = $q !== '' && !$stories && !$images && !$books && !$tags; ?>
   <?php endif; ?>
   <?php if ($books): ?>
   <section aria-labelledby="s-books"><h2 id="s-books" class="small">Books</h2>
-    <ul class="boxes"><?php foreach ($books as $b): ?><li><a href="/books#<?= e($b['slug']) ?>"><?= e($b['title']) ?></a></li><?php endforeach; ?></ul>
+    <ul class="boxes"><?php foreach ($books as $b): ?><li><a href="/books/<?= e($b['slug']) ?>"><?= e($b['title']) ?></a></li><?php endforeach; ?></ul>
   </section>
   <?php endif; ?>
   <?php if ($stories): ?>

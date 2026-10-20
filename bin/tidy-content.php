@@ -64,4 +64,44 @@ $fl = $pdo->prepare("UPDATE pages SET body_html = REPLACE(body_html, 'Look for m
 $fl->execute();
 echo "FetLife link added: " . $fl->rowCount() . "\n";
 
+// Book descriptions list the stories in each collection. Where a listed story (or series) is on this site, link to it here instead of to the old outside site.
+$stories = [];
+foreach ($pdo->query("SELECT title, slug, legacy_path FROM stories WHERE status = 'published' AND kind IN ('story','post') ORDER BY published_at")->fetchAll() as $r) {
+    $stories[mb_strtolower(trim($r['title']))] = $r['legacy_path'] ?: '/story/' . $r['slug'];
+}
+foreach ($pdo->query('SELECT title, slug FROM series')->fetchAll() as $r) {
+    $stories[mb_strtolower(trim($r['title']))] = '/series/' . $r['slug'];   // a series name wins over a single chapter of the same name
+}
+$swapped = 0;
+$upd = $pdo->prepare('UPDATE books SET description_html = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?');
+foreach ($pdo->query('SELECT id, description_html FROM books')->fetchAll() as $b) {
+    $html = preg_replace_callback('#<a\b[^>]*\bhref="https?://[^"]+"[^>]*>(.*?)</a>#is', function (array $m) use ($stories, &$swapped): string {
+        $key = mb_strtolower(trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        if (!isset($stories[$key])) {
+            return $m[0];
+        }
+        $swapped++;
+        return '<a href="' . $stories[$key] . '">' . $m[1] . '</a>';
+    }, (string) $b['description_html']) ?? $b['description_html'];
+    if ($html !== $b['description_html']) {
+        $upd->execute([$html, $b['id']]);
+    }
+}
+echo "Book story links moved to this site: $swapped\n";
+
+// About page: drop the "I will be building this out" promise; link the two collections and mention the single stories.
+$about = $pdo->query("SELECT id, body_html FROM pages WHERE slug = 'about-prurient-interests'")->fetch();
+$aboutChanged = 0;
+if ($about) {
+    $b = $about['body_html'];
+    $b = str_replace(' I will be building out this "About" page a bit more though there\'s not a whole lot to say about the site that isn\'t up front and in your face.', ' There\'s not a whole lot to say about the site that isn\'t up front and in your face.', $b);
+    $b = str_replace('I will be building out this "About" page a bit more though there\'s not a whole lot to say about the site that isn\'t up front and in your face.', 'There\'s not a whole lot to say about the site that isn\'t up front and in your face.', $b);
+    $b = str_replace('my two collections, Life on My Knees and Freedom is Slavery. I highly recommend you pick up either or both of these fine volumes.</p>', 'my two collections, <a href="/books/life-on-my-knees">Life on My Knees</a> and <a href="/books/freedom-is-slavery">Freedom is Slavery</a>. I highly recommend you pick up either or both of these fine volumes. I have also released single stories on Kindle; they are all on the <a href="/books">Books page</a>.</p>', $b);
+    if ($b !== $about['body_html']) {
+        $pdo->prepare('UPDATE pages SET body_html = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$b, $about['id']]);
+        $aboutChanged = 1;
+    }
+}
+echo "About page reworded: $aboutChanged\n";
+
 echo "Done.\n";

@@ -152,7 +152,7 @@ final class BloggerImporter
         }
         if ($legacy) {
             $this->pdo->prepare('INSERT INTO redirects (from_path, to_url, code, created_at) VALUES (?,?,301,?) ON DUPLICATE KEY UPDATE to_url = VALUES(to_url)')
-                ->execute([$legacy, '/books#' . $slug, $now]);
+                ->execute([$legacy, '/books/' . $slug, $now]);
         }
     }
 

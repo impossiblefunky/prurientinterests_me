@@ -112,7 +112,8 @@ function ext_label(string $html, string $note = ' (opens in a new tab)'): string
         return $html . $sr;
     }
     if (preg_match('#^(.*?)([^\s<>]+)((?:</[^>]+>)*)\s*$#s', $html, $m)) {
-        return $m[1] . '<span class="nowrap">' . $m[2] . ext_icon() . $sr . '</span>' . $m[3];
+        // one wrapper span, so a flex button treats the label as a single item and keeps the space before the last word
+        return '<span class="ext">' . $m[1] . '<span class="nowrap">' . $m[2] . ext_icon() . $sr . '</span>' . $m[3] . '</span>';
     }
     return '<span class="nowrap">' . ext_icon() . $sr . '</span>';
 }
@@ -202,4 +203,32 @@ function asset(string $path): string
 {
     $file = dirname(__DIR__, 2) . '/public' . $path;
     return $path . (is_file($file) ? '?v=' . filemtime($file) : '');
+}
+
+/** "Buy Kindle edition on Amazon": wording for a purchase button, from the edition name and where the link goes. */
+function buy_label(array $ed): string
+{
+    $host = strtolower((string) parse_url((string) $ed['purchase_url'], PHP_URL_HOST));
+    $where = match (true) {
+        str_contains($host, 'amazon.') || $host === 'amzn.to' || $host === 'a.co' => 'Amazon',
+        str_contains($host, 'lulu.') || $host === 'bit.ly' => 'Lulu',
+        default => preg_replace('/^www\./', '', $host) ?: 'the store',
+    };
+    $name = trim((string) $ed['name']);
+    $name = stripos($name, 'edition') === false ? $name . ' edition' : $name;
+    return 'Buy ' . $name . ' on ' . $where;
+}
+
+/** True when any purchase link goes to Amazon (so the Associates notice is shown). */
+function has_amazon_link(array $books): bool
+{
+    foreach ($books as $b) {
+        foreach ($b['editions'] ?? [] as $e) {
+            $host = strtolower((string) parse_url((string) $e['purchase_url'], PHP_URL_HOST));
+            if (str_contains($host, 'amazon.') || $host === 'amzn.to') {
+                return true;
+            }
+        }
+    }
+    return false;
 }

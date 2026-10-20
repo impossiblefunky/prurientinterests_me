@@ -1,16 +1,16 @@
-<?php /** @var array $picks @var array $tags @var array $albums @var ?array $book */ ?>
+<?php /** @var array $picks @var array $tags @var array $albums @var ?array $book @var array $yearCounts */ ?>
 <section class="hero" aria-labelledby="hero-h">
   <div class="hero-text">
     <p class="eyebrow"><?= e(setting('home_eyebrow')) ?></p>
     <h1 id="hero-h"><?= nl2br(e(str_replace('. ', ".\n", setting('home_headline', setting('site_title'))))) ?></h1>
     <p class="lead"><?= e(setting('home_intro')) ?></p>
-    <p class="actions"><a class="btn" href="/stories">Enter the story library &rarr;</a><?php if ($book): ?> <a class="btn" href="/books">Explore the books &rarr;</a><?php endif; ?></p>
+    <p class="actions"><a class="btn primary" href="/stories">Enter the story library &rarr;</a><?php if ($book): ?> <a class="btn" href="/books">Explore the books &rarr;</a><?php endif; ?></p>
   </div>
   <?php if ($book): ?>
   <div class="hero-book">
     <?= View_cover($book) ?>
     <p class="meta">Featured book</p>
-    <p><a class="btn" href="/books">Explore the book &rarr;</a></p>
+    <p><a class="btn" href="/books/<?= e($book['slug']) ?>">About this book &rarr;</a></p>
   </div>
   <?php endif; ?>
 </section>
@@ -29,9 +29,13 @@
   <div class="grid"><?php foreach ($picks as $s) { include __DIR__ . '/partials/story_card.php'; } ?></div>
 </section>
 <?php endif; ?>
-<section class="panel" aria-labelledby="years-h">
-  <div><p class="eyebrow">2006 — present</p><h2 id="years-h">The years are part of the story.</h2><p class="lead">Browse the years, explore a series, or let chance choose.</p></div>
-  <p><a class="btn" href="/stories">Open the archive &rarr;</a></p>
+<section class="panel years" aria-labelledby="years-h">
+  <div>
+    <p class="eyebrow">2006 — present</p><h2 id="years-h">The years are part of the story.</h2>
+    <p class="lead">Browse by year, explore a series, or let chance choose.</p>
+    <?php if ($yearCounts): ?><ul class="chips year-chips" aria-label="Browse the archive by year"><?php foreach ($yearCounts as $y): ?><li><a class="chip" href="/stories?year=<?= (int) $y['y'] ?>"><?= (int) $y['y'] ?> <span class="meta">(<?= (int) $y['n'] ?>)</span></a></li><?php endforeach; ?></ul><?php endif; ?>
+  </div>
+  <p class="actions"><a class="btn primary" href="/random">Surprise me with a story &rarr;</a> <a class="btn" href="/stories">Open the archive &rarr;</a></p>
 </section>
 <?php if ($albums): ?>
 <section class="band" aria-labelledby="fasc-h">
