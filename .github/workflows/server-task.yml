@@ -14,6 +14,7 @@ on:
         required: true
         options:
           - check
+          - diagnose
           - write-env
           - migrate
           - create-admin
@@ -100,6 +101,8 @@ jobs:
               printf '%s\n' "APP_ENV=production" "APP_URL=$APP_URL" "APP_KEY=$KEY" "DB_HOST=$DB_HOST" "DB_NAME=$DB_NAME" "DB_USER=$DB_USER" "DB_PASSWORD=$DB_PASSWORD" "APP_TIMEZONE=America/New_York" \
                 | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && umask 077 && cat > .env && chmod 600 .env"
               echo "Wrote .env (the secret values are not shown)." ;;
+            diagnose)
+              remote "\$PHP bin/diagnose.php" ;;
             migrate)
               remote "\$PHP bin/migrate.php" ;;
             create-admin)
