@@ -115,8 +115,8 @@ final class Admin
             'gallery' => [
                 'group' => 'Media & galleries', 'label' => 'Images', 'singular' => 'image', 'table' => 'gallery_items', 'tags' => 'gallery', 'order' => 'sort_order, id DESC',
                 'list_sql' => 'SELECT g.*, a.title AS album FROM gallery_items g LEFT JOIN albums a ON a.id = g.album_id',
-                'columns' => ['title' => 'Title', 'album' => 'Album', 'status' => 'Status', 'sort_order' => 'Order'],
-                'bulk' => true, 'bulk_status' => true,
+                'columns' => ['thumb' => 'Picture', 'title' => 'Title', 'album' => 'Album', 'status' => 'Status', 'sort_order' => 'Order'],
+                'bulk' => true, 'bulk_status' => true, 'per_page' => 60,
                 'fields' => [
                     ['title', 'Title', 'text', 'required' => true, 'max' => 255],
                     ['file', 'Image', 'image', 'dir' => 'gallery', 'required' => true, 'extra' => ['thumb' => 'thumb', 'width' => 'width', 'height' => 'height']],
@@ -324,6 +324,10 @@ final class Admin
             $this->bulkStatus($key, $def);
             return;
         }
+        if ($key === 'gallery' && ($rest[0] ?? '') === 'duplicates') {
+            $this->duplicates();
+            return;
+        }
         if ($key === 'gallery' && ($rest[0] ?? '') === 'upload') {
             $this->bulkUpload($method);
             return;
@@ -405,9 +409,19 @@ final class Admin
                 $args[] = $v;
             }
         }
-        $st = $this->pdo->prepare($sql . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY ' . $def['order'] . ' LIMIT 3000');
+        $per = (int) ($def['per_page'] ?? 0);
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $total = 0;
+        if ($per) {
+            $cnt = $this->pdo->prepare('SELECT COUNT(*) FROM (' . $sql . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ') x');
+            $cnt->execute($args);
+            $total = (int) $cnt->fetchColumn();
+            $page = min($page, max(1, (int) ceil($total / $per)));
+        }
+        $st = $this->pdo->prepare($sql . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY ' . $def['order'] . ($per ? ' LIMIT ' . $per . ' OFFSET ' . (($page - 1) * $per) : ' LIMIT 3000'));
         $st->execute($args);
-        $this->page($def['label'], View::partial('admin/list', ['key' => $key, 'def' => $def, 'rows' => $st->fetchAll(), 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
+        $this->page($def['label'], View::partial('admin/list', ['key' => $key, 'def' => $def, 'rows' => $st->fetchAll(), 'csrf' => Auth::csrf(), 'tz' => $this->tz(),
+            'page' => $page, 'pages' => $per ? (int) ceil($total / $per) : 1, 'total' => $total]));
     }
 
     // ---- data handling -------------------------------------------------------------------------------------
@@ -655,8 +669,14 @@ final class Admin
         $st = $this->pdo->prepare("SELECT * FROM {$def['table']} WHERE id = ?");
         $st->execute([$id]);
         if ($row = $st->fetch()) {
+            $shared = false;
+            if ($key === 'gallery') {   // never remove a picture file another entry still uses
+                $u = $this->pdo->prepare('SELECT COUNT(*) FROM gallery_items WHERE file = ? AND id <> ?');
+                $u->execute([$row['file'], $id]);
+                $shared = (int) $u->fetchColumn() > 0;
+            }
             foreach ($def['fields'] as $f) {
-                if ($f[2] === 'image') {
+                if ($f[2] === 'image' && !$shared) {
                     Images::delete($row[$f[0]] ?? null);
                     foreach ($f['extra'] ?? [] as $k => $col) {
                         if ($k === 'thumb') {
@@ -676,7 +696,8 @@ final class Admin
             $this->pdo->prepare("DELETE FROM {$def['table']} WHERE id = ?")->execute([$id]);
             $this->flash(ucfirst($def['singular']) . ' deleted.');
         }
-        header('Location: /admin/' . $key, true, 303);
+        $back = (string) ($_POST['back'] ?? '');
+        header('Location: ' . (preg_match('#^/admin/[a-z/]+(\?[a-z0-9=&]*)?$#', $back) ? $back : '/admin/' . $key), true, 303);
     }
 
     private function restore(string $key, int $storyId, int $revId): void
@@ -874,6 +895,13 @@ final class Admin
     private function flash(string $msg): void
     {
         $_SESSION['flash'] = $msg;
+    }
+
+    private function duplicates(): void
+    {
+        $waiting = \App\Media\Dupes::fill($this->pdo, 600);
+        $groups = $waiting ? [] : \App\Media\Dupes::groups($this->pdo);
+        $this->page('Duplicate images', View::partial('admin/duplicates', ['groups' => $groups, 'waiting' => $waiting, 'csrf' => Auth::csrf()]));
     }
 
     private function page(string $title, string $body): void
