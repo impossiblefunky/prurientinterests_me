@@ -25,9 +25,12 @@ set_exception_handler(function (Throwable $e): void {
     http_response_code(500);
     header('Content-Type: text/html; charset=utf-8');
     header('X-Robots-Tag: noindex');
-    echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Something went wrong</title>'
-        . '<body style="font:18px/1.6 system-ui;margin:3rem auto;max-width:34rem;padding:0 1rem"><h1>Something went wrong</h1>'
-        . '<p>The page could not be shown. Please try again in a moment.</p><p><a href="/">Home</a></p></body></html>';
+    echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Something went wrong | Prurient Interests</title>'
+        . '<style>body{margin:0;background:#0f0d10;color:#f3eae3;font:18px/1.7 Georgia,serif}main{max-width:36rem;margin:0 auto;padding:4rem 1.5rem}h1{font-weight:400;font-size:2.2rem;line-height:1.15}'
+        . 'a{color:#e0a6c2}.row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.5rem}.row a{display:inline-flex;align-items:center;min-height:44px;padding:0 1rem;border:1px solid #5b4d55;text-decoration:none;font:16px system-ui}'
+        . 'a:focus-visible{outline:3px solid #ffd166;outline-offset:2px}</style>'
+        . '<body><main><h1>Something went wrong on our end.</h1><p>That page could not be shown. It is not you, and nothing was lost. Please try again in a moment, or head somewhere else:</p>'
+        . '<nav class="row" aria-label="Other places"><a href="/">Home</a><a href="/stories">Stories</a><a href="/tags">Interests</a><a href="/gallery">Gallery</a><a href="/books">Books</a><a href="/contact">Tell me about it</a></nav></main></body></html>';
 });
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
