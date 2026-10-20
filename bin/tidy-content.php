@@ -104,4 +104,37 @@ if ($about) {
 }
 echo "About page reworded: $aboutChanged\n";
 
+// A link inside an old post points at /2010/04/satin-met-laddie.html; the story lives at /2012/03/.
+$pdo->prepare('INSERT INTO redirects (from_path, to_url, code, created_at) VALUES (?,?,301,UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE to_url = VALUES(to_url)')
+    ->execute(['/2010/04/satin-met-laddie.html', '/2012/03/satin-met-laddie.html']);
+echo "Redirect for the old Satin Met a Laddie address: ok\n";
+
+// Links to the old pornoperson.blogspot.com addresses become links to the same page on this site (the paths are identical);
+// a link ending in .htm is fixed to .html when that is the real page.
+$known = [];
+foreach ($pdo->query('SELECT legacy_path FROM stories WHERE legacy_path IS NOT NULL UNION SELECT legacy_path FROM pages WHERE legacy_path IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN) as $lp) {
+    $known[$lp] = true;
+}
+$moved = 0;
+foreach (['stories', 'pages'] as $table) {
+    $upd = $pdo->prepare("UPDATE $table SET body_html = ? WHERE id = ?");
+    foreach ($pdo->query("SELECT id, body_html FROM $table WHERE body_html LIKE '%blogspot.%'")->fetchAll() as $r) {
+        $html = preg_replace_callback('#(href=")https?://(?:www\.)?pornoperson\.blogspot\.[a-z.]+(/[^"\s<>]*)(")#i', function (array $m) use ($known, &$moved): string {
+            $path = preg_replace('/[?#].*$/', '', $m[2]);
+            if (!isset($known[$path]) && isset($known[$path . 'l'])) {
+                $path .= 'l';
+            }
+            if (!isset($known[$path])) {
+                return $m[0];
+            }
+            $moved++;
+            return $m[1] . $path . $m[3];
+        }, $r['body_html']) ?? $r['body_html'];
+        if ($html !== $r['body_html']) {
+            $upd->execute([$html, $r['id']]);
+        }
+    }
+}
+echo "Old blogspot links moved to this site: $moved\n";
+
 echo "Done.\n";
