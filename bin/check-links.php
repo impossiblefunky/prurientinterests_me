@@ -4,6 +4,8 @@ declare(strict_types=1);
 /**
  * Checks every outside link (and hot-linked picture) in stories, pages and books.
  *   php bin/check-links.php          prints counts and the dead links; writes storage/reports/links.tsv
+ *   php bin/check-links.php --strip-preview   also says how many dead links and pictures would be removed from posts
+ *   php bin/check-links.php --strip           removes them (the words stay; each changed story keeps its old text as a revision)
  * Run it on the server (the work computer cannot always reach other sites). Read-only: it changes nothing.
  * "dead" = the page is gone (404/410), the site name no longer exists, refuses connections, or has a broken certificate.
  * "blocked" = the site answered but would not talk to a robot (403, 429, 999) or had a server error; check those by hand.
@@ -14,6 +16,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Support\Db;
 use App\Support\Env;
+use App\Support\LinkStripper;
 
 $pdo = Db::pdo();
 $mine = array_filter([parse_url((string) Env::get('APP_URL', ''), PHP_URL_HOST), 'prurientinterests.me', 'www.prurientinterests.me']);
@@ -134,4 +137,59 @@ foreach (array_slice($dead, 0, 300) as [$code, $u, $n, $where]) {
 }
 if (count($dead) > 300) {
     echo '... and ' . (count($dead) - 300) . " more in storage/reports/links.tsv\n";
+}
+
+$strip = in_array('--strip', $argv, true);
+if ($strip || in_array('--strip-preview', $argv, true)) {
+    // Only links that are certainly gone: the page answered 404/410, or the site name no longer exists (after the slow retry).
+    $gone = [];
+    foreach ($found as $u => $info) {
+        $r = $res[$u] ?? ['code' => 0, 'err' => 28];
+        if (in_array($r['code'], [404, 410], true) || ($r['code'] === 0 && $r['err'] === 6)) {
+            $gone[$u] = true;
+        }
+    }
+    echo count($gone) . " links are certainly dead.\n";
+    $totLinks = $totPics = $changed = 0;
+    $now = Db::utcNow();
+    foreach ($pdo->query("SELECT id, title, body_html FROM stories WHERE status = 'published'")->fetchAll() as $r) {
+        [$new, $l, $p] = LinkStripper::strip((string) $r['body_html'], $gone);
+        if ($new === $r['body_html']) {
+            continue;
+        }
+        $changed++;
+        $totLinks += $l;
+        $totPics += $p;
+        if ($strip) {
+            $pdo->prepare('INSERT INTO story_revisions (story_id, title, body_html, saved_at) VALUES (?,?,?,?)')->execute([$r['id'], $r['title'], $r['body_html'], $now]);
+            $pdo->prepare('UPDATE stories SET body_html = ? WHERE id = ?')->execute([$new, $r['id']]);
+        }
+    }
+    foreach ($pdo->query("SELECT id, body_html FROM pages WHERE status = 'published'")->fetchAll() as $r) {
+        [$new, $l, $p] = LinkStripper::strip((string) $r['body_html'], $gone);
+        if ($new !== $r['body_html']) {
+            $changed++;
+            $totLinks += $l;
+            $totPics += $p;
+            if ($strip) {
+                $pdo->prepare('UPDATE pages SET body_html = ? WHERE id = ?')->execute([$new, $r['id']]);
+            }
+        }
+    }
+    foreach ($pdo->query("SELECT id, description_html, excerpt_html FROM books WHERE status = 'published'")->fetchAll() as $r) {
+        [$d, $l1, $p1] = LinkStripper::strip((string) $r['description_html'], $gone);
+        [$x, $l2, $p2] = LinkStripper::strip((string) $r['excerpt_html'], $gone);
+        if ($d !== $r['description_html'] || $x !== $r['excerpt_html']) {
+            $changed++;
+            $totLinks += $l1 + $l2;
+            $totPics += $p1 + $p2;
+            if ($strip) {
+                $pdo->prepare('UPDATE books SET description_html = ?, excerpt_html = ? WHERE id = ?')->execute([$d, $x, $r['id']]);
+            }
+        }
+    }
+    printf("%s: %d links unwrapped and %d broken pictures removed across %d posts, pages and books.\n", $strip ? 'Done' : 'Preview only, nothing changed', $totLinks, $totPics, $changed);
+    if ($strip && $changed) {
+        passthru(PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/rebuild-search.php') . ' --all');
+    }
 }
