@@ -1,4 +1,4 @@
-<?php /** @var array $picks @var array $tags @var array $albums @var ?array $book @var array $yearCounts */ ?>
+<?php /** @var array $picks @var array $tags @var array $albums @var ?array $book @var array $yearCounts @var array $stats */ ?>
 <section class="hero" aria-labelledby="hero-h">
   <div class="hero-text">
     <p class="eyebrow"><?= e(setting('home_eyebrow')) ?></p>
@@ -14,6 +14,16 @@
   </div>
   <?php endif; ?>
 </section>
+<?php if (!empty($stats['written'])): ?>
+<section class="stats" aria-label="The archive in numbers">
+  <ul>
+    <li><a href="/stories"><span class="num"><?= number_format($stats['written']) ?></span><span class="lbl">stories and posts</span></a></li>
+    <?php if ($stats['pictures']): ?><li><a href="/gallery"><span class="num"><?= number_format($stats['pictures']) ?></span><span class="lbl">pictures</span></a></li><?php endif; ?>
+    <?php if ($stats['books']): ?><li><a href="/books"><span class="num"><?= number_format($stats['books']) ?></span><span class="lbl">books</span></a></li><?php endif; ?>
+    <?php if ($stats['since']): ?><li><span class="num"><?= max(1, (int) gmdate('Y') - (int) $stats['since']) ?></span><span class="lbl">years of writing, since <?= (int) $stats['since'] ?></span></li><?php endif; ?>
+  </ul>
+</section>
+<?php endif; ?>
 <?php if ($tags): ?>
 <section class="band" aria-labelledby="draw-h">
   <p class="eyebrow">Explore by interest</p>

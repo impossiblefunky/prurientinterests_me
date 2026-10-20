@@ -157,6 +157,12 @@ final class Site
             $ser['label'] = 'A series';
             $picks[] = $ser;
         }
+        $stats = [
+            'written' => (int) $pdo->query('SELECT COUNT(*) FROM stories s WHERE ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN)->fetchColumn(),
+            'pictures' => (int) $pdo->query('SELECT COUNT(*) FROM gallery_items WHERE status = "published"')->fetchColumn(),
+            'books' => (int) $pdo->query('SELECT COUNT(*) FROM books WHERE status = "published"')->fetchColumn(),
+            'since' => (int) $pdo->query('SELECT MIN(YEAR(s.published_at)) FROM stories s WHERE ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN)->fetchColumn(),
+        ];
         $yearCounts = $pdo->query('SELECT YEAR(s.published_at) y, COUNT(*) n FROM stories s WHERE ' . self::LIVE . ' AND s.kind IN ' . self::WRITTEN . ' GROUP BY y ORDER BY y DESC')->fetchAll();
         $tags = $pdo->query('SELECT t.slug, t.name FROM tags t WHERE t.featured = 1 AND t.hidden = 0 AND t.kind = "subject" ORDER BY t.sort_order, t.name LIMIT 12')->fetchAll();
         if (!$tags) {
@@ -164,7 +170,7 @@ final class Site
         }
         $albums = $pdo->query('SELECT a.slug, a.title FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.featured DESC, a.sort_order, a.id LIMIT 3')->fetchAll();
         $book = $pdo->query('SELECT * FROM books WHERE status = "published" ORDER BY featured DESC, sort_order, id DESC LIMIT 1')->fetch() ?: null;
-        $this->send('home', ['picks' => $picks, 'tags' => $tags, 'albums' => $albums, 'book' => $book, 'yearCounts' => $yearCounts], [
+        $this->send('home', ['picks' => $picks, 'tags' => $tags, 'albums' => $albums, 'book' => $book, 'yearCounts' => $yearCounts, 'stats' => $stats], [
             'title' => setting('site_title') . ' | ' . setting('tagline'),
             'description' => setting('home_intro', setting('tagline')),
             'canonical' => site_url('/'),

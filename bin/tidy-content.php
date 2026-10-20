@@ -151,4 +151,28 @@ if ($c) {
     echo 'Contact page links: ' . preg_match_all('#<a\b[^>]*href="([^"]+)"#i', (string) $c['body_html'], $mm) . ' (' . implode(', ', array_map(fn($u) => parse_url($u, PHP_URL_HOST), $mm[1])) . ")\n";
 }
 
+// More tag tidying (each step runs once, and never undoes a choice made later in the admin).
+$renameTag = function (string $oldSlug, string $name, string $newSlug, ?string $kind = null) use ($pdo): void {
+    $t = $pdo->prepare('SELECT id FROM tags WHERE slug = ?');
+    $t->execute([$oldSlug]);
+    $id = $t->fetchColumn();
+    $t->execute([$newSlug]);
+    if (!$id || $t->fetchColumn()) {
+        return;
+    }
+    $pdo->prepare('UPDATE tags SET name = ?, slug = ?' . ($kind ? ', kind = ?' : '') . ' WHERE id = ?')->execute($kind ? [$name, $newSlug, $kind, $id] : [$name, $newSlug, $id]);
+    $pdo->prepare('INSERT INTO tag_aliases (alias_slug, tag_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE tag_id = VALUES(tag_id)')->execute([$oldSlug, $id]);
+    echo "Tag renamed: $oldSlug -> $name (the old address still works)\n";
+};
+$renameTag('history', 'Memoir', 'memoir');                    // personal recollections, not history
+$renameTag('youtube', 'Videos', 'videos', 'format');          // the video posts: a format, not a source
+// Homepage interests: choose them on purpose the first time (afterwards the admin Tags screen decides).
+if ((int) $pdo->query('SELECT COUNT(*) FROM tags WHERE featured = 1')->fetchColumn() === 0) {
+    $pick = $pdo->prepare('UPDATE tags SET featured = 1, sort_order = ? WHERE slug = ?');
+    foreach (['m2m', 'domme', 'fetish', 'dom', 'feminization', 'cuckold', 'bondage', 'transsexual'] as $i => $slug) {
+        $pick->execute([$i + 1, $slug]);
+    }
+    echo "Homepage interests chosen: M2M, Domme, Fetish, Dom, Feminization, Cuckold, Bondage, Transsexual\n";
+}
+
 echo "Done.\n";

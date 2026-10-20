@@ -301,3 +301,15 @@ html.paper mark{background:#f2d27a;color:#241b20}
 html.paper .chip{background:rgba(122,31,61,.07);border-color:rgba(122,31,61,.4)}
 .book h2.small{margin-top:1.75rem}
 .buy-list+.meta{margin-top:.25rem}
+
+/* The archive in numbers (homepage) */
+.stats{grid-column:1/-1;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:1.5rem 0}
+.stats ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem var(--gutter,2rem)}
+.stats a,.stats li>.num{text-decoration:none}
+.stats li{display:flex;flex-direction:column}
+.stats a{display:flex;flex-direction:column;color:var(--text);min-height:44px}
+.stats .num{font:2.6rem/1.1 var(--serif);color:var(--text)}
+.stats .lbl{font:.95rem var(--sans);color:var(--muted)}
+.stats a:hover .num{color:var(--rose)}
+@media (max-width:40rem){.stats ul{grid-template-columns:repeat(2,minmax(0,1fr))}.stats .num{font-size:2.1rem}}
+.stats+.band{border-top:0}

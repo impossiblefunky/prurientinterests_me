@@ -31,6 +31,7 @@ on:
           - publish-images
           - tidy-content
           - check-links
+          - check-forms
           - strip-dead-links-preview
           - strip-dead-links
           - retire-sugasm-preview
@@ -156,6 +157,8 @@ jobs:
               remote "\$PHP bin/check-links.php --strip-preview" ;;
             strip-dead-links)
               remote "\$PHP bin/check-links.php --strip" ;;
+            check-forms)
+              remote "\$PHP bin/check-forms.php" ;;
             check-links)
               remote "\$PHP bin/check-links.php" ;;
             tidy-content)
