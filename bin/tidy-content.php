@@ -137,4 +137,18 @@ foreach (['stories', 'pages'] as $table) {
 }
 echo "Old blogspot links moved to this site: $moved\n";
 
+// The automatic dead-link cleanup unwrapped the Lush Stories profile link on the Contact page (that site answers robots with a 404).
+// Put the link back, and say what the page now reads so it can be checked.
+$c = $pdo->query("SELECT id, body_html FROM pages WHERE slug = 'contact'")->fetch();
+if ($c && stripos($c['body_html'], 'lushstories.com/pornoperson') === false && preg_match('#(?<![>\w])My profile page#', $c['body_html'])) {
+    $b = preg_replace('#(?<![>\w])My profile page#', '<a href="http://www.lushstories.com/pornoperson">My profile page</a>', $c['body_html'], 1);
+    $pdo->prepare('UPDATE pages SET body_html = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$b, $c['id']]);
+    echo "Lush Stories link restored on the Contact page.\n";
+}
+if ($c) {
+    $c = $pdo->query("SELECT body_html FROM pages WHERE slug = 'contact'")->fetch();
+    echo 'Contact page now reads: ' . trim(preg_replace('/\s+/', ' ', strip_tags(str_replace('</p>', ' | ', (string) $c['body_html'])))) . "\n";
+    echo 'Contact page links: ' . preg_match_all('#<a\b[^>]*href="([^"]+)"#i', (string) $c['body_html'], $mm) . ' (' . implode(', ', array_map(fn($u) => parse_url($u, PHP_URL_HOST), $mm[1])) . ")\n";
+}
+
 echo "Done.\n";

@@ -145,6 +145,9 @@ if ($strip || in_array('--strip-preview', $argv, true)) {
     $gone = [];
     foreach ($found as $u => $info) {
         $r = $res[$u] ?? ['code' => 0, 'err' => 28];
+        if (preg_match('/pornoperson|pr0noperson/i', $u)) {
+            continue;   // Mike's own profile addresses are never removed automatically, even when a site answers a robot oddly
+        }
         if (in_array($r['code'], [404, 410], true) || ($r['code'] === 0 && $r['err'] === 6)) {
             $gone[$u] = true;
         }
