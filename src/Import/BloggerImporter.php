@@ -83,10 +83,12 @@ final class BloggerImporter
         $vals = [$title, $body, $isLive ? 'published' : 'draft', $published, $e['author'], $words, $legacy, trim($e['meta']), $e['content'], $this->utc($e['updated']) ?? $now, $kind];
         if ($id) {
             $this->pdo->prepare('UPDATE stories SET title=?, body_html=?, status=?, published_at=?, author=?, word_count=?, legacy_path=?, summary=?, source_html=?, updated_at=?, kind=? WHERE id=?')->execute([...$vals, $id]);
+            $this->pdo->prepare('UPDATE stories SET search_text = ? WHERE id = ?')->execute([search_plain($body), $id]);
         } else {
             $this->pdo->prepare('INSERT INTO stories (title, body_html, status, published_at, author, word_count, legacy_path, summary, source_html, updated_at, kind, slug, source, source_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,"blogger",?,?)')
                 ->execute([...$vals, $this->uniqueSlug('stories', $slug), $e['id'], $now]);
             $id = $this->pdo->lastInsertId();
+            $this->pdo->prepare('UPDATE stories SET search_text = ? WHERE id = ?')->execute([search_plain($body), $id]);
         }
         $this->labels((int) $id, $e['labels']);
         return (int) $id;

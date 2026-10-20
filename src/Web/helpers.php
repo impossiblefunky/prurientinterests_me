@@ -130,3 +130,41 @@ function View_cover(array $b): string
     }
     return '<div class="cover placeholder" role="img" aria-label="' . e($b['title']) . ' by ' . e(setting('author_name')) . '"><span class="eyebrow">' . e(setting('author_name')) . '</span><span class="cover-title">' . e($b['title']) . '</span></div>';
 }
+
+
+/** Plain text of story HTML for the site search: no tags, entities decoded, whitespace squeezed. */
+function search_plain(string $html): string
+{
+    $html = preg_replace('#<(br|/p|/h[1-6]|/li|/blockquote|hr|/div|/tr)[^>]*>#i', ' ', $html) ?? $html;
+    return trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+}
+
+/** A short passage of $text around the first match of any term, with the terms wrapped in <mark>. Safe to print as HTML. */
+function search_snippet(string $text, array $terms, int $span = 170): string
+{
+    $pos = null;
+    foreach ($terms as $t) {
+        $p = mb_stripos($text, $t);
+        if ($p !== false && ($pos === null || $p < $pos)) {
+            $pos = $p;
+        }
+    }
+    $start = max(0, ($pos ?? 0) - 60);
+    $part = mb_substr($text, $start, $span);
+    $out = e(($start > 0 ? '…' : '') . $part . (mb_strlen($text) > $start + $span ? '…' : ''));
+    foreach ($terms as $t) {
+        $out = preg_replace('/(' . preg_quote(e($t), '/') . ')/iu', '<mark>$1</mark>', $out) ?? $out;
+    }
+    return $out;
+}
+
+
+/** $text escaped for HTML with every search term wrapped in <mark>. */
+function search_mark(string $text, array $terms): string
+{
+    $out = e($text);
+    foreach ($terms as $t) {
+        $out = preg_replace('/(' . preg_quote(e($t), '/') . ')/iu', '<mark>$1</mark>', $out) ?? $out;
+    }
+    return $out;
+}

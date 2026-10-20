@@ -64,7 +64,7 @@ foreach ($pdo->query('SELECT id, slug, title, body_html FROM stories ORDER BY id
     if ($write) {
         $now = Db::utcNow();
         $pdo->prepare('INSERT INTO story_revisions (story_id, title, body_html, saved_at) VALUES (?,?,?,?)')->execute([$s['id'], $s['title'], $s['body_html'], $now]);
-        $pdo->prepare('UPDATE stories SET body_html = ?, updated_at = ? WHERE id = ?')->execute([trim($new), $now, $s['id']]);
+        $pdo->prepare('UPDATE stories SET body_html = ?, search_text = ?, updated_at = ? WHERE id = ?')->execute([trim($new), search_plain(trim($new)), $now, $s['id']]);
     }
 }
 echo $write ? "Done: $total fixes in $changed stories. Old text is kept under Earlier versions in the CMS.\n" : "Preview only: $total fixes in $changed stories. Run again with --write to apply.\n";

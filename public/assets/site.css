@@ -152,3 +152,15 @@ body.bare main{display:grid;place-items:center;min-height:100vh;padding:1.5rem}
 body.gated{overflow:hidden}
 .gate-overlay{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);overflow:auto;padding:1.5rem}
 .gate-h{font:clamp(3rem,9vw,4.6rem)/1.05 var(--sans);margin:1rem 0 1.5rem;text-align:center}
+
+/* Site search */
+.site-search{display:flex;gap:.4rem;align-items:center;margin-left:auto}
+.site-search input{width:11rem;min-height:44px}
+.results{list-style:none;margin:0;padding:0}
+.results li{padding:1rem 0;border-bottom:1px solid var(--line)}
+.results h3{margin:0 0 .25rem;font-size:1.4rem}
+.results h3 a{color:var(--text)}
+mark{background:#5d3347;color:var(--text);padding:0 .15em;border-radius:.15em}
+html.paper mark{background:#f2d27a;color:#241b20}
+.gallery figcaption{color:var(--text)}
+@media (max-width:48rem){.site-search{margin-left:0;width:100%}.site-search input{flex:1}}

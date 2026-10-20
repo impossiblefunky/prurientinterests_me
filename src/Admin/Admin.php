@@ -612,6 +612,9 @@ final class Admin
                 }
             }
         }
+        if ($key === 'stories') {
+            $data['search_text'] = search_plain((string) ($data['body_html'] ?? ''));
+        }
         $cols = array_keys($data);
         if ($id) {
             if (in_array($def['table'], ['stories', 'pages', 'books'], true)) {
@@ -685,8 +688,8 @@ final class Admin
             if ($c = $cur->fetch()) {
                 $this->pdo->prepare('INSERT INTO story_revisions (story_id, title, body_html, saved_at) VALUES (?,?,?,?)')->execute([$storyId, $c['title'], $c['body_html'], Db::utcNow()]);
             }
-            $this->pdo->prepare('UPDATE stories SET title = ?, body_html = ?, word_count = ?, updated_at = ? WHERE id = ?')
-                ->execute([$rev['title'], $rev['body_html'], word_count($rev['body_html']), Db::utcNow(), $storyId]);
+            $this->pdo->prepare('UPDATE stories SET title = ?, body_html = ?, search_text = ?, word_count = ?, updated_at = ? WHERE id = ?')
+                ->execute([$rev['title'], $rev['body_html'], search_plain($rev['body_html']), word_count($rev['body_html']), Db::utcNow(), $storyId]);
             $this->flash('Earlier version restored.');
         }
         header('Location: /admin/stories/' . $storyId, true, 303);

@@ -78,6 +78,6 @@ jobs:
             (cd storage/cache && sha256sum -c composer.phar.sha256sum)
           fi
           $PHP storage/cache/composer.phar install --no-dev --optimize-autoloader --no-interaction
-          if [ -f .env ]; then $PHP bin/migrate.php; else echo "No .env yet: skipping migrations. Run the Server task called write-env first."; fi
+          if [ -f .env ]; then $PHP bin/migrate.php && $PHP bin/rebuild-search.php; else echo "No .env yet: skipping migrations. Run the Server task called write-env first."; fi
           echo "deployed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           REMOTE

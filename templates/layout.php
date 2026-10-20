@@ -44,6 +44,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php if (empty($meta['bare'])): ?>
 <header class="site-header">
   <a class="brand" href="/"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag"><?= e(setting('tagline')) ?></span></a>
+  <form class="site-search" method="get" action="/search" role="search"><label for="hq" class="sr-only">Search the site</label><input id="hq" name="q" type="search" placeholder="Search…" value="<?= e((string) ($_GET['q'] ?? '')) ?>"><button class="btn" type="submit">Search</button></form>
   <nav aria-label="Main"><ul>
     <?php foreach ($d['nav']['header'] as $n): ?><li><a class="navbtn" href="<?= e($n['url']) ?>"<?= $current($n['url']) ? ' aria-current="page"' : '' ?>><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>

@@ -30,6 +30,7 @@ final class Site
         $r->get('/search/label/{label}', fn(array $p) => $this->oldLabel($p['label']));
         $r->get('/story/{slug}', fn(array $p) => $this->story('slug', $p['slug']));
         $r->get('/gallery', fn() => $this->gallery());
+        $r->get('/search', fn() => $this->search());
         $r->get('/books', fn() => $this->books());
         $r->get('/about', fn() => $this->page(['about', 'about-prurient-interests']));
         $r->get('/p/{file}', fn(array $p) => $this->legacyPage('/p/' . $p['file']));
@@ -146,7 +147,7 @@ final class Site
             'description' => setting('home_intro', setting('tagline')),
             'canonical' => site_url('/'),
             'jsonld' => [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => setting('site_title'), 'url' => site_url('/'),
-                'potentialAction' => ['@type' => 'SearchAction', 'target' => site_url('/stories?q={search_term_string}'), 'query-input' => 'required name=search_term_string']]],
+                'potentialAction' => ['@type' => 'SearchAction', 'target' => site_url('/search?q={search_term_string}'), 'query-input' => 'required name=search_term_string']]],
         ]);
     }
 
@@ -327,40 +328,123 @@ final class Site
 
     // ---- gallery, books, pages -----------------------------------------------------------------------------
 
+    /** The one big photo gallery: every published image, newest blog post first; optionally one album, a search, or an interest. */
     private function gallery(): void
     {
         $pdo = Db::pdo();
-        $albums = $pdo->query('SELECT a.* FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.sort_order, a.id')->fetchAll();
         $only = (string) ($_GET['album'] ?? '');
-        $perAlbum = $only === '' ? 12 : 48;                     // the overview shows a taste of each album; one album pages through everything
-        $page = max(1, (int) ($_GET['page'] ?? 1));
-        $pages = 1;
-        foreach ($albums as &$a) {
-            $c = $pdo->prepare('SELECT COUNT(*) FROM gallery_items WHERE album_id = ? AND status = "published"');
-            $c->execute([$a['id']]);
-            $a['total'] = (int) $c->fetchColumn();
-            if ($only !== '' && $a['slug'] !== $only) {
-                $a['items'] = [];
-                continue;
-            }
-            $offset = $only !== '' ? ($page - 1) * $perAlbum : 0;
-            if ($only !== '') {
-                $pages = max(1, (int) ceil($a['total'] / $perAlbum));
-                $page = min($page, $pages);
-                $offset = ($page - 1) * $perAlbum;
-            }
-            $st = $pdo->prepare("SELECT * FROM gallery_items WHERE album_id = ? AND status = 'published' ORDER BY sort_order, id LIMIT $perAlbum OFFSET $offset");
-            $st->execute([$a['id']]);
-            $a['items'] = $st->fetchAll();
+        $q = trim((string) ($_GET['q'] ?? ''));
+        $tagSlug = (string) ($_GET['tag'] ?? '');
+        $where = 'g.status = "published"';
+        $args = [];
+        if ($only !== '') {
+            $where .= ' AND g.album_id = (SELECT id FROM albums WHERE slug = ? AND status = "published")';
+            $args[] = $only;
         }
-        unset($a);
-        $loose = $only === '' ? $pdo->query('SELECT * FROM gallery_items WHERE album_id IS NULL AND status = "published" ORDER BY sort_order, id DESC LIMIT 24')->fetchAll() : [];
-        $this->send('gallery', ['albums' => $albums, 'loose' => $loose, 'only' => $only, 'topTags' => $this->topTags(), 'page' => $page, 'pages' => $pages, 'base' => '/gallery', 'cur' => $only !== '' ? ['album' => $only] : []], [
+        if ($q !== '') {
+            foreach ($this->terms($q) as $t) {
+                $like = '%' . addcslashes($t, '%_\\') . '%';
+                $where .= ' AND (g.title LIKE ? OR g.caption LIKE ? OR g.credit LIKE ?)';
+                array_push($args, $like, $like, $like);
+            }
+        }
+        if ($tagSlug !== '') {
+            $where .= ' AND g.id IN (SELECT it.item_id FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_type = "gallery" AND t.slug = ?)';
+            $args[] = $tagSlug;
+        }
+        $perPage = 48;
+        $count = $pdo->prepare("SELECT COUNT(*) FROM gallery_items g WHERE $where");
+        $count->execute($args);
+        $total = (int) $count->fetchColumn();
+        $pages = max(1, (int) ceil($total / $perPage));
+        $page = min($pages, max(1, (int) ($_GET['page'] ?? 1)));
+        $st = $pdo->prepare("SELECT g.* FROM gallery_items g LEFT JOIN stories s ON s.id = g.story_id WHERE $where ORDER BY COALESCE(s.published_at, g.created_at) DESC, g.id DESC LIMIT $perPage OFFSET " . (($page - 1) * $perPage));
+        $st->execute($args);
+        $albums = $pdo->query('SELECT a.slug, a.title FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.sort_order, a.id')->fetchAll();
+        $filtered = $only !== '' || $q !== '' || $tagSlug !== '';
+        $cur = array_filter(['album' => $only, 'q' => $q, 'tag' => $tagSlug], fn($v) => $v !== '');
+        $this->send('gallery', ['items' => $st->fetchAll(), 'albums' => $albums, 'only' => $only, 'q' => $q, 'total' => $total, 'topTags' => $this->topTags(), 'page' => $page, 'pages' => $pages, 'base' => '/gallery', 'cur' => $cur], [
             'title' => 'The gallery' . ($page > 1 ? " (page $page)" : '') . ' | ' . setting('site_title'),
-            'description' => 'Collected images, arranged by mood and fascination.',
-            'canonical' => site_url('/gallery' . ($only !== '' ? '?album=' . rawurlencode($only) . ($page > 1 ? "&page=$page" : '') : '')),
-            'robots' => $only !== '' ? 'noindex,follow' : null,
+            'description' => 'Collected images, newest first.',
+            'canonical' => site_url('/gallery' . ($page > 1 && !$filtered ? "?page=$page" : '')),
+            'robots' => $filtered ? 'noindex,follow' : null,
             'breadcrumbs' => [['Gallery', '/gallery']],
+        ]);
+    }
+
+    /** @return list<string> search words, at least two characters each */
+    private function terms(string $q): array
+    {
+        $clean = preg_replace('/[^\p{L}\p{N}\' -]+/u', ' ', $q) ?? '';
+        return array_values(array_unique(array_filter(preg_split('/\s+/u', trim($clean)) ?: [], fn($t) => mb_strlen($t) >= 2)));
+    }
+
+    /** Site-wide search: stories, gallery images, books and interests. */
+    private function search(): void
+    {
+        $pdo = Db::pdo();
+        $q = trim((string) ($_GET['q'] ?? ''));
+        $terms = $this->terms($q);
+        $like = fn(string $t) => '%' . addcslashes($t, '%_\\') . '%';
+        $res = ['stories' => [], 'total' => 0, 'images' => [], 'imageTotal' => 0, 'books' => [], 'tags' => [], 'page' => 1, 'pages' => 1];
+        if ($terms) {
+            // Stories: every word must appear in the title or the story text; title matches first, then newest.
+            $where = ' AND s.kind <> "picture"';
+            $args = [];
+            foreach ($terms as $t) {
+                $where .= ' AND (s.title LIKE ? OR s.summary LIKE ? OR s.search_text LIKE ?)';
+                array_push($args, $like($t), $like($t), $like($t));
+            }
+            $order = 'ORDER BY (s.title LIKE ?) DESC, s.published_at DESC, s.id DESC';
+            $c = $pdo->prepare('SELECT COUNT(*) FROM stories s WHERE ' . self::LIVE . $where);
+            $c->execute($args);
+            $res['total'] = (int) $c->fetchColumn();
+            $res['pages'] = max(1, (int) ceil($res['total'] / 10));
+            $res['page'] = min($res['pages'], max(1, (int) ($_GET['page'] ?? 1)));
+            $st = $pdo->prepare('SELECT s.id, s.slug, s.legacy_path, s.title, s.published_at, s.kind, s.search_text, s.word_count FROM stories s WHERE ' . self::LIVE . $where . " $order LIMIT 10 OFFSET " . (($res['page'] - 1) * 10));
+            $st->execute([...$args, $like($q)]);
+            $res['stories'] = $st->fetchAll();
+
+            // Images: captions, titles and credits.
+            $iw = 'g.status = "published"';
+            $ia = [];
+            foreach ($terms as $t) {
+                $iw .= ' AND (g.title LIKE ? OR g.caption LIKE ? OR g.credit LIKE ?)';
+                array_push($ia, $like($t), $like($t), $like($t));
+            }
+            $ic = $pdo->prepare("SELECT COUNT(*) FROM gallery_items g WHERE $iw");
+            $ic->execute($ia);
+            $res['imageTotal'] = (int) $ic->fetchColumn();
+            if ($res['imageTotal']) {
+                $is = $pdo->prepare("SELECT g.* FROM gallery_items g LEFT JOIN stories s ON s.id = g.story_id WHERE $iw ORDER BY COALESCE(s.published_at, g.created_at) DESC, g.id DESC LIMIT 12");
+                $is->execute($ia);
+                $res['images'] = $is->fetchAll();
+            }
+
+            // Books and interests: any word.
+            $bw = [];
+            $ba = [];
+            $tw = [];
+            $ta = [];
+            foreach ($terms as $t) {
+                $bw[] = '(b.title LIKE ? OR b.subtitle LIKE ? OR b.description_html LIKE ?)';
+                array_push($ba, $like($t), $like($t), $like($t));
+                $tw[] = 't.name LIKE ?';
+                $ta[] = $like($t);
+            }
+            $bs = $pdo->prepare('SELECT b.slug, b.title FROM books b WHERE b.status = "published" AND (' . implode(' AND ', $bw) . ') ORDER BY b.sort_order');
+            $bs->execute($ba);
+            $res['books'] = $bs->fetchAll();
+            $ts = $pdo->prepare('SELECT t.slug, t.name FROM tags t WHERE (' . implode(' OR ', $tw) . ') ORDER BY t.name LIMIT 12');
+            $ts->execute($ta);
+            $res['tags'] = $ts->fetchAll();
+        }
+        $this->send('search', $res + ['q' => $q, 'terms' => $terms, 'base' => '/search', 'cur' => $q !== '' ? ['q' => $q] : [], 'page' => $res['page'], 'pages' => $res['pages']], [
+            'title' => ($q !== '' ? 'Search: ' . $q : 'Search') . ' | ' . setting('site_title'),
+            'description' => 'Search the stories, images, books and interests.',
+            'canonical' => site_url('/search'),
+            'robots' => 'noindex,follow',
+            'breadcrumbs' => [['Search', '/search']],
         ]);
     }
 
