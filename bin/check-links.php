@@ -48,15 +48,15 @@ foreach ($pdo->query("SELECT slug, description_html, excerpt_html FROM books WHE
 echo number_format(count($found)) . " outside links to check.\n";
 
 /** @param list<string> $urls @return array<string,array{code:int,err:int}> */
-function probe(array $urls, bool $get): array
+function probe(array $urls, bool $get, int $parallel = 25): array
 {
     $mh = curl_multi_init();
     $out = [];
     $handles = [];
     $queue = $urls;
     $start = time();
-    $launch = function () use (&$queue, &$handles, $mh, $get): void {
-        while (count($handles) < 25 && $queue) {
+    $launch = function () use (&$queue, &$handles, $mh, $get, $parallel): void {
+        while (count($handles) < $parallel && $queue) {
             $u = array_shift($queue);
             $ch = curl_init($u);
             curl_setopt_array($ch, [
@@ -98,6 +98,13 @@ $first = probe(array_keys($found), false);
 $again = array_keys(array_filter($first, fn($r) => $r['code'] >= 400 && !in_array($r['code'], [404, 410], true) || ($r['code'] === 0 && !in_array($r['err'], [6, 7, 60], true))));
 $second = $again ? probe($again, true) : [];
 $res = array_merge($first, $second);
+// Name-lookup and connection failures are often just the server being overloaded by 25 lookups at once.
+// Try those again, a few at a time, and keep the second answer.
+$retry = array_keys(array_filter($res, fn($r) => $r['code'] === 0 && in_array($r['err'], [6, 7, 28, 35, 56], true)));
+if ($retry) {
+    echo count($retry) . " links had no answer; trying those again slowly...\n";
+    $res = array_merge($res, probe($retry, true, 4));
+}
 
 $class = fn(array $r): string => match (true) {
     $r['code'] >= 200 && $r['code'] < 400 => 'ok',
