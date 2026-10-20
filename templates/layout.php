@@ -24,8 +24,11 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php if ($robots): ?><meta name="robots" content="<?= e($robots) ?>">
 <?php endif; ?>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0f0d10">
 <link rel="alternate" type="application/atom+xml" title="<?= e(setting('site_title')) ?>" href="/feed">
 <?php if ($canon): ?><link rel="canonical" href="<?= e($canon) ?>">

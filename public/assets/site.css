@@ -253,3 +253,8 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .search-btn{gap:.45rem;font-weight:600;box-shadow:0 0 0 1px var(--rose)}
 .search-btn:hover{box-shadow:0 0 0 2px var(--rose)}
 .search-icon{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+/* Touch targets: breadcrumb and card-title links and the filter radios are at least 44px tall */
+.crumbs a,.grid h3 a,.chapters h3 a{display:inline-flex;align-items:center;min-height:44px}
+.crumbs{margin:-1.25rem 0 1rem}
+.radios label{display:inline-flex;align-items:center;gap:.5rem;min-height:44px;padding-right:.75rem}
+.crumbs li{display:flex;align-items:center}
