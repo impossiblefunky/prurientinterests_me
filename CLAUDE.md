@@ -33,5 +33,5 @@ Public site + small CMS for Mike White's adult writing site, replacing the Blogg
 - DONE: public site and CMS styled to the designs (screenshots compared). Still to do: mobile pass at 320px with axe, a real cover image for books, a contact form or contact method, a /feed for old Blogger feed readers, and alt text for the ~1,095 draft gallery items.
 - Comments are stored privately in `comments_archive` (215) and not shown anywhere yet; decide whether to display them.
 - Confirm tag names after import (capitalised automatically; e.g. "Elust", "Sugasm"). Merge duplicates in Tags.
-- Decide which of the 22 "series" candidates (Pet for MAGA 1-3, High School Bully, Teaching the Teacher...) to turn into series; chapter order is set in the story editor.
+- Decide which groups of numbered titles (about 8 found, for example Pet for MAGA 1-3) to turn into series; chapter order is set in the story editor.
 - DreamHost: create database, domain pointing to `<project>/public`, SSH key and the four GitHub secrets (see docs/SETUP.md).
