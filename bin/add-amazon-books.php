@@ -42,9 +42,9 @@ $details = [
     'doctor-s-orders' => ['B00B6WUEJ8', '2013-01-27', 9, ['A man goes to a specialist about his apparent sterility for a very interesting assessment.']],
 ];
 $upBook = $pdo->prepare("UPDATE books SET description_html = ?, subtitle = ?, published_on = ?, updated_at = UTC_TIMESTAMP() WHERE slug = ? AND description_html = ''");
-$upEd = $pdo->prepare("UPDATE book_editions SET purchase_url = ?, isbn = ? WHERE book_id = ? AND name = 'Kindle Edition' AND purchase_url = ?");
-// wording fix approved by Mike (2026-10-20): "an Dominant" -> "a Dominant"
-$pdo->exec("UPDATE books SET description_html = REPLACE(description_html, 'an Dominant', 'a Dominant') WHERE slug = 'meeting-max'");
+// Associates tag taken from the SiteStripe link Mike supplied; his own amzn.to links are never overwritten.
+const ASSOC_TAG = 'proboothcas0f-20';
+$upEd = $pdo->prepare("UPDATE book_editions SET purchase_url = ?, isbn = ? WHERE book_id = ? AND name = 'Kindle Edition' AND purchase_url NOT LIKE 'https://amzn.to/%' AND purchase_url <> ?");
 $filled = 0;
 foreach ($details as $slug => $d) {
     $html = implode("\n", array_map(fn($p) => '<p>' . htmlspecialchars($p, ENT_NOQUOTES) . '</p>', $d[3]));
@@ -52,7 +52,8 @@ foreach ($details as $slug => $d) {
     $find->execute([$slug]);
     $bid = (int) $find->fetchColumn();
     if ($bid) {
-        $upEd->execute(['https://www.amazon.com/dp/' . $d[0], $d[4] ?? '', $bid, AUTHOR_PAGE]);
+        $link = 'https://www.amazon.com/dp/' . $d[0] . '?tag=' . ASSOC_TAG;
+        $upEd->execute([$link, $d[4] ?? '', $bid, $link]);
         $filled += $upEd->rowCount();
     }
 }
