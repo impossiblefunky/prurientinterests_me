@@ -12,11 +12,22 @@ $fmt = function (string $col, $v) use ($tz) {
   <?php foreach ($options as $ov => $ol): ?><li><a class="chip" href="/admin/<?= e($key) ?>?<?= e($col) ?>=<?= e((string) $ov) ?>"<?= ($_GET[$col] ?? '') === (string) $ov ? ' aria-current="true"' : '' ?>><?= e($ol) ?></a></li><?php endforeach; ?>
 </ul></nav>
 <?php endforeach; ?>
+<?php $bulk = !empty($def['bulk_status']); $drafts = $bulk ? count(array_filter($rows, fn($r) => ($r['status'] ?? '') === 'draft')) : 0; ?>
+<?php if ($rows && $bulk): ?>
+<form id="bulk-form" class="bulkbar" method="post" action="/admin/<?= e($key) ?>/bulk"><input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+  <span class="meta">With the ticked rows:</span>
+  <?php if ($key === 'albums'): ?><button class="btn primary" type="submit" name="do" value="publish_with_images">Publish albums and all their images</button><?php else: ?><button class="btn primary" type="submit" name="do" value="publish">Publish</button><?php endif; ?>
+  <button class="btn" type="submit" name="do" value="draft">Move back to draft</button>
+  <?php if ($drafts): ?><button class="btn" type="submit" name="do" value="publish_all_drafts" data-confirm-click="Publish ALL <?= (int) $drafts ?> drafts? Everything will be visible to visitors. You can move items back to draft afterwards.">Publish all <?= (int) $drafts ?> drafts</button><?php endif; ?>
+</form>
+<?php endif; ?>
 <?php if ($rows): ?>
 <table data-sortable><thead><tr>
+<?php if ($bulk): ?><th scope="col" data-nosort><input type="checkbox" data-select-all aria-label="Tick every row"></th><?php endif; ?>
 <?php foreach ($def['columns'] as $col => $label): ?><th scope="col"><?= e($label) ?></th><?php endforeach; ?>
 <th scope="col" data-nosort>Actions</th></tr></thead><tbody>
 <?php foreach ($rows as $r): ?><tr>
+<?php if ($bulk): ?><td><input type="checkbox" form="bulk-form" name="ids[]" value="<?= (int) $r['id'] ?>" aria-label="Tick <?= e((string) ($r['title'] ?? '')) ?>"></td><?php endif; ?>
 <?php $first = true; foreach ($def['columns'] as $col => $label): $v = $r[$col] ?? ''; ?>
 <td data-sort="<?= e((string) $v) ?>"><?php if ($first): ?><a href="/admin/<?= e($key) ?>/<?= (int) $r['id'] ?>"><?= e($fmt($col, $v)) ?: '(untitled)' ?></a><?php else: ?><?= e($fmt($col, $v)) ?><?php endif; ?></td>
 <?php $first = false; endforeach; ?>

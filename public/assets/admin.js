@@ -32,6 +32,16 @@
     var m = ev.target.getAttribute && ev.target.getAttribute('data-confirm');
     if (m && !window.confirm(m)) ev.preventDefault();
   });
+  // Select-all checkbox in a table header.
+  document.querySelectorAll('input[data-select-all]').forEach(function (box) {
+    box.addEventListener('change', function () {
+      box.closest('table').querySelectorAll('tbody input[type=checkbox]').forEach(function (c) { c.checked = box.checked; });
+    });
+  });
+  document.addEventListener('click', function (ev) {
+    var m = ev.target.closest && ev.target.closest('[data-confirm-click]');
+    if (m && !window.confirm(m.getAttribute('data-confirm-click'))) ev.preventDefault();
+  });
   // Formatting toolbar wraps the selected text in the textarea.
   document.querySelectorAll('.toolbar').forEach(function (bar) {
     var ta = document.getElementById(bar.getAttribute('data-for'));

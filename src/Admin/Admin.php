@@ -116,7 +116,7 @@ final class Admin
                 'group' => 'Media & galleries', 'label' => 'Images', 'singular' => 'image', 'table' => 'gallery_items', 'tags' => 'gallery', 'order' => 'sort_order, id DESC',
                 'list_sql' => 'SELECT g.*, a.title AS album FROM gallery_items g LEFT JOIN albums a ON a.id = g.album_id',
                 'columns' => ['title' => 'Title', 'album' => 'Album', 'status' => 'Status', 'sort_order' => 'Order'],
-                'bulk' => true,
+                'bulk' => true, 'bulk_status' => true,
                 'fields' => [
                     ['title', 'Title', 'text', 'required' => true, 'max' => 255],
                     ['file', 'Image', 'image', 'dir' => 'gallery', 'required' => true, 'extra' => ['thumb' => 'thumb', 'width' => 'width', 'height' => 'height']],
@@ -133,7 +133,7 @@ final class Admin
                 ],
             ],
             'albums' => [
-                'group' => 'Media & galleries', 'label' => 'Albums', 'singular' => 'album', 'table' => 'albums', 'tags' => 'album', 'order' => 'sort_order, title',
+                'group' => 'Media & galleries', 'label' => 'Albums', 'singular' => 'album', 'table' => 'albums', 'tags' => 'album', 'order' => 'sort_order, title', 'bulk_status' => true,
                 'list_sql' => 'SELECT a.*, (SELECT COUNT(*) FROM gallery_items g WHERE g.album_id = a.id) AS images FROM albums a',
                 'columns' => ['title' => 'Album', 'images' => 'Images', 'status' => 'Status', 'sort_order' => 'Order'],
                 'fields' => [
@@ -317,6 +317,10 @@ final class Admin
         }
         if ($method === 'POST' && $action === 'delete' && $id) {
             $this->delete($key, $def, $id);
+            return;
+        }
+        if ($method === 'POST' && ($rest[0] ?? '') === 'bulk' && !empty($def['bulk_status'])) {
+            $this->bulkStatus($key, $def);
             return;
         }
         if ($key === 'gallery' && ($rest[0] ?? '') === 'upload') {
@@ -686,6 +690,44 @@ final class Admin
             $this->flash('Earlier version restored.');
         }
         header('Location: /admin/stories/' . $storyId, true, 303);
+    }
+
+    /**
+     * Publish or hide many images or albums at once, from the checkboxes on the list (or every draft in one go).
+     * @param array<string,mixed> $def
+     */
+    private function bulkStatus(string $key, array $def): void
+    {
+        $do = (string) ($_POST['do'] ?? '');
+        $ids = array_values(array_filter(array_map('intval', (array) ($_POST['ids'] ?? []))));
+        $table = $def['table'];
+        $n = 0;
+        if ($do === 'publish_all_drafts') {
+            $n = $this->pdo->exec("UPDATE $table SET status = 'published' WHERE status = 'draft'");
+            if ($key === 'albums') {
+                $this->pdo->exec("UPDATE gallery_items SET status = 'published' WHERE album_id IN (SELECT id FROM albums WHERE status = 'published')");
+            }
+        } elseif ($ids && in_array($do, ['publish', 'draft', 'publish_with_images'], true)) {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $st = $this->pdo->prepare("UPDATE $table SET status = ? WHERE id IN ($in)");
+            $st->execute([$do === 'draft' ? 'draft' : 'published', ...$ids]);
+            $n = $st->rowCount();
+            if ($key === 'albums' && $do === 'publish_with_images') {
+                $this->pdo->prepare("UPDATE gallery_items SET status = 'published' WHERE album_id IN ($in)")->execute($ids);
+            }
+            if ($key === 'albums' && $do === 'draft') {
+                $this->pdo->prepare("UPDATE gallery_items SET status = 'draft' WHERE album_id IN ($in)")->execute($ids);
+            }
+        } else {
+            $this->flash('Tick at least one row first.');
+            header('Location: /admin/' . $key, true, 303);
+            return;
+        }
+        $this->flash(match ($do) {
+            'draft' => "$n " . $def['singular'] . ($n === 1 ? '' : 's') . ' moved back to draft.',
+            default => "$n " . $def['singular'] . ($n === 1 ? '' : 's') . ' published.',
+        });
+        header('Location: /admin/' . $key, true, 303);
     }
 
     /** @return array<string,string> id => title for a query returning id and title */

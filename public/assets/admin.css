@@ -42,3 +42,6 @@ body.admin main{max-width:none;margin:0;padding:1.5rem 2rem 4rem}
 .field input[type=text],.field input[type=url],.field input[type=number],.field input[type=date],.field input[type=datetime-local],.field select,.field textarea,.field input[type=file]{max-width:none;width:100%}
 .toolbar .btn{min-height:44px}
 @media (max-width:60rem){.desk{grid-template-columns:1fr}.sidebar{position:static;border-right:0;border-bottom:1px solid var(--line)}.editor.has-panel{grid-template-columns:1fr}}
+
+.bulkbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1rem 0;padding:.75rem 1rem;background:var(--panel)}
+td input[type=checkbox],th input[type=checkbox]{width:1.5rem;min-height:1.5rem}

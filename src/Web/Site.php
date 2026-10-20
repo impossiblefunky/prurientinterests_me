@@ -332,17 +332,33 @@ final class Site
         $pdo = Db::pdo();
         $albums = $pdo->query('SELECT a.* FROM albums a WHERE a.status = "published" AND EXISTS (SELECT 1 FROM gallery_items g WHERE g.album_id = a.id AND g.status = "published") ORDER BY a.sort_order, a.id')->fetchAll();
         $only = (string) ($_GET['album'] ?? '');
+        $perAlbum = $only === '' ? 12 : 48;                     // the overview shows a taste of each album; one album pages through everything
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $pages = 1;
         foreach ($albums as &$a) {
-            $st = $pdo->prepare('SELECT * FROM gallery_items WHERE album_id = ? AND status = "published" ORDER BY sort_order, id');
+            $c = $pdo->prepare('SELECT COUNT(*) FROM gallery_items WHERE album_id = ? AND status = "published"');
+            $c->execute([$a['id']]);
+            $a['total'] = (int) $c->fetchColumn();
+            if ($only !== '' && $a['slug'] !== $only) {
+                $a['items'] = [];
+                continue;
+            }
+            $offset = $only !== '' ? ($page - 1) * $perAlbum : 0;
+            if ($only !== '') {
+                $pages = max(1, (int) ceil($a['total'] / $perAlbum));
+                $page = min($page, $pages);
+                $offset = ($page - 1) * $perAlbum;
+            }
+            $st = $pdo->prepare("SELECT * FROM gallery_items WHERE album_id = ? AND status = 'published' ORDER BY sort_order, id LIMIT $perAlbum OFFSET $offset");
             $st->execute([$a['id']]);
             $a['items'] = $st->fetchAll();
         }
         unset($a);
-        $loose = $pdo->query('SELECT * FROM gallery_items WHERE album_id IS NULL AND status = "published" ORDER BY sort_order, id DESC LIMIT 120')->fetchAll();
-        $this->send('gallery', ['albums' => $albums, 'loose' => $loose, 'only' => $only, 'topTags' => $this->topTags()], [
-            'title' => 'The gallery | ' . setting('site_title'),
+        $loose = $only === '' ? $pdo->query('SELECT * FROM gallery_items WHERE album_id IS NULL AND status = "published" ORDER BY sort_order, id DESC LIMIT 24')->fetchAll() : [];
+        $this->send('gallery', ['albums' => $albums, 'loose' => $loose, 'only' => $only, 'topTags' => $this->topTags(), 'page' => $page, 'pages' => $pages, 'base' => '/gallery', 'cur' => $only !== '' ? ['album' => $only] : []], [
+            'title' => 'The gallery' . ($page > 1 ? " (page $page)" : '') . ' | ' . setting('site_title'),
             'description' => 'Collected images, arranged by mood and fascination.',
-            'canonical' => site_url('/gallery'),
+            'canonical' => site_url('/gallery' . ($only !== '' ? '?album=' . rawurlencode($only) . ($page > 1 ? "&page=$page" : '') : '')),
             'robots' => $only !== '' ? 'noindex,follow' : null,
             'breadcrumbs' => [['Gallery', '/gallery']],
         ]);

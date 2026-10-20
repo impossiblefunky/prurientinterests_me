@@ -21,6 +21,7 @@ on:
           - unpack-takeout
           - import-blogger-dry-run
           - import-blogger
+          - import-book-covers
           - import-images-dry-run
           - import-images
           - spellcheck
@@ -115,6 +116,8 @@ jobs:
               remote "\$PHP bin/import-blogger.php storage/import/feed.atom --dry-run" ;;
             import-blogger)
               remote "\$PHP bin/import-blogger.php storage/import/feed.atom" ;;
+            import-book-covers)
+              remote "\$PHP bin/import-book-covers.php storage/import/takeout.zip" ;;
             import-images-dry-run)
               remote "\$PHP bin/import-images.php storage/import/takeout.zip --dry-run" ;;
             import-images)
