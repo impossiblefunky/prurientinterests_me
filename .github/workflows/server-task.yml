@@ -1,0 +1,137 @@
+# Runs ONE fixed task on the server, from a button: Actions > Server task > Run workflow > pick a task.
+# No terminal needed. Only the tasks listed below can run; there is no free-form command box.
+# Secrets used: DH_SSH_PRIVATE_KEY, DH_HOST, DH_USER, DH_PATH (same as the deploy), plus
+#   DB_HOST, DB_NAME, DB_USER, DB_PASSWORD   (only for write-env)
+#   ADMIN_PASSWORD                            (only for create-admin; delete it from GitHub afterwards)
+name: Server task
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to run on the server
+        type: choice
+        required: true
+        options:
+          - check
+          - write-env
+          - migrate
+          - create-admin
+          - import-blogger-dry-run
+          - import-blogger
+          - import-images-dry-run
+          - import-images
+          - spellcheck
+          - apply-spelling-preview
+          - apply-spelling
+      app_url:
+        description: "write-env only: the site address"
+        type: string
+        default: https://prurientinterests.me
+      overwrite_env:
+        description: "write-env only: replace an existing .env"
+        type: boolean
+        default: false
+      admin_email:
+        description: "create-admin only: the email you will sign in with"
+        type: string
+        default: ""
+      admin_name:
+        description: "create-admin only: your name"
+        type: string
+        default: ""
+
+concurrency:
+  group: server-task
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the settings
+        env:
+          DH_HOST: ${{ secrets.DH_HOST }}
+          DH_USER: ${{ secrets.DH_USER }}
+          DH_PATH: ${{ secrets.DH_PATH }}
+          DH_KEY: ${{ secrets.DH_SSH_PRIVATE_KEY }}
+        run: |
+          for v in DH_HOST DH_USER DH_PATH DH_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::The GitHub secret for $v is missing."; exit 1; fi
+          done
+          printf '%s' "$DH_PATH" | grep -Eq '^/home/[a-z0-9_]+/[A-Za-z0-9._-]+$' || { echo "::error::DH_PATH looks wrong: $DH_PATH"; exit 1; }
+          printf '%s' "$DH_PATH" | grep -qi 'prurient' || { echo "::error::DH_PATH must contain 'prurient'."; exit 1; }
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DH_SSH_PRIVATE_KEY }}
+
+      - name: Trust the DreamHost host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run the task
+        env:
+          TASK: ${{ inputs.task }}
+          APP_URL: ${{ inputs.app_url }}
+          OVERWRITE: ${{ inputs.overwrite_env }}
+          ADMIN_EMAIL: ${{ inputs.admin_email }}
+          ADMIN_NAME: ${{ inputs.admin_name }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          HOST: ${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}
+          DIR: ${{ secrets.DH_PATH }}
+        run: |
+          set -euo pipefail
+          remote() { ssh -o BatchMode=yes "$HOST" "cd '$DIR' && $1"; }
+          case "$TASK" in
+            check)
+              remote "echo 'Connected as' \$(whoami) 'in' \$(pwd); php -v | head -1; ls -1 | head -20; test -f .env && echo '.env: present' || echo '.env: MISSING (run write-env)'" ;;
+            write-env)
+              for v in DB_HOST DB_NAME DB_USER DB_PASSWORD; do [ -n "${!v}" ] || { echo "::error::Add the GitHub secret $v first."; exit 1; }; done
+              if [ "$OVERWRITE" != "true" ] && remote "test -f .env"; then echo ".env already exists, so it was left alone. Tick overwrite_env to replace it."; exit 0; fi
+              KEY=$(openssl rand -hex 32)
+              printf '%s\n' "APP_ENV=production" "APP_URL=$APP_URL" "APP_KEY=$KEY" "DB_HOST=$DB_HOST" "DB_NAME=$DB_NAME" "DB_USER=$DB_USER" "DB_PASSWORD=$DB_PASSWORD" "APP_TIMEZONE=America/New_York" \
+                | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && umask 077 && cat > .env && chmod 600 .env"
+              echo "Wrote .env (the secret values are not shown)." ;;
+            migrate)
+              remote "php bin/migrate.php" ;;
+            create-admin)
+              [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ] || { echo "::error::Fill in admin_email and add the GitHub secret ADMIN_PASSWORD (12+ characters)."; exit 1; }
+              printf '%s\n' "$ADMIN_PASSWORD" | ssh -o BatchMode=yes "$HOST" "cd '$DIR' && php bin/create-admin.php '$ADMIN_EMAIL' '${ADMIN_NAME//\'/}'"
+              echo "Now delete the ADMIN_PASSWORD secret from GitHub." ;;
+            import-blogger-dry-run)
+              remote "php bin/import-blogger.php storage/import/feed.atom --dry-run" ;;
+            import-blogger)
+              remote "php bin/import-blogger.php storage/import/feed.atom" ;;
+            import-images-dry-run)
+              remote "php bin/import-images.php storage/import/takeout.zip --dry-run" ;;
+            import-images)
+              remote "php bin/import-images.php storage/import/takeout.zip" ;;
+            spellcheck)
+              remote "php bin/spellcheck.php" ;;
+            apply-spelling-preview)
+              remote "php bin/apply-spelling.php" ;;
+            apply-spelling)
+              remote "php bin/apply-spelling.php --write" ;;
+            *) echo "::error::Unknown task"; exit 1 ;;
+          esac
+
+      - name: Save reports so you can download them
+        if: ${{ inputs.task == 'spellcheck' || inputs.task == 'import-images' || inputs.task == 'import-images-dry-run' }}
+        run: |
+          mkdir -p reports
+          scp -o BatchMode=yes "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}:${{ secrets.DH_PATH }}/storage/reports/*" reports/ || true
+          ls -la reports
+
+      - name: Upload the reports
+        if: ${{ inputs.task == 'spellcheck' || inputs.task == 'import-images' || inputs.task == 'import-images-dry-run' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ inputs.task }}
+          path: reports/
+          retention-days: 7

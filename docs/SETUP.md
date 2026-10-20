@@ -1,88 +1,43 @@
-# Setting up prurientinterests.me on DreamHost
+# Setting up prurientinterests.me on DreamHost (no terminal needed)
 
-Words used below: **repo** = the project's folder on GitHub. **SSH** = a secure way to run commands on the DreamHost server. **Migration** = a numbered SQL file that builds or changes database tables. **Secret** = a private value stored in GitHub, never in the code.
+Words used below. **Repo**: the project's folder on GitHub. **Secret**: a private value stored in GitHub, never in the code. **Workflow**: a button on GitHub's Actions tab that does a job for you. **Migration**: a numbered file that builds the database tables.
 
-## 1. In the DreamHost panel
-1. Websites > Manage Websites > Add Website: **prurientinterests.me**. Choose **PHP 8.3**. Set the web directory to `<project folder>/public` (for example `/home/USER/prurientinterests.me/public`).
-2. Turn on **Let's Encrypt** (free HTTPS) for the domain.
-3. Websites > MySQL Databases: create a database, a user and a hostname (for example `mysql.prurientinterests.me`). Write down the database name, user, password and host.
-4. Users > Manage Users: make sure your user has **Shell access** (not "FTP only").
+Facts for this site: DreamHost user `cashiers`, server `pdx1-shared-a1-04.dreamhost.com`, project folder `/home/cashiers/prurientinterests.me`, website address `https://prurientinterests.me`. The old blog is at pornoperson.blogspot.com and is not touched until the very end.
 
-## 2. Put the secrets in GitHub
-Repo > Settings > Secrets and variables > Actions > New repository secret. Add:
-- `DH_HOST`: your DreamHost server name (for example `iad1-shared-b7-01.dreamhost.com`)
-- `DH_USER`: your DreamHost shell username
-- `DH_PATH`: the project folder, for example `/home/USER/prurientinterests.me`
-- `DH_SSH_PRIVATE_KEY`: a new SSH key made just for deploys. Create it on your computer with this command, add the `.pub` file's contents to the server's `~/.ssh/authorized_keys`, and paste the *private* file here:
+## 1. DreamHost: add the website
+Websites > Manage Websites > Add Website > Fully Hosted. Domain `prurientinterests.me`, user `cashiers`, web directory `prurientinterests.me/public`, PHP 8.3, free Let's Encrypt certificate, remove "www".
 
-```bash
-ssh-keygen -t ed25519 -f deploy_key -N "" -C "github-deploy"
-```
+## 2. DreamHost: a database
+Websites > MySQL Databases. Create a hostname `mysql.prurientinterests.me`, then a database (for example `prurient`), a database user (for example `prurientdb`) and a long password. Keep the four values: host, database name, user, password.
 
-## 3. One-time server setup
-Connect to the server (the panel shows the exact address), then create the private settings file *outside* the public folder. Copy `.env.example` to `.env` inside the project folder and fill in the database values and a long random `APP_KEY`. Set `APP_ENV=production` and `APP_URL=https://prurientinterests.me`.
+## 3. A deploy key (a lock and key pair for GitHub to log in as `cashiers`)
+You will do this in the browser: GitHub shows you the private half once; the public half goes into DreamHost. Claude will give you each click when you get here.
 
-After the first deploy (push to `main`, or Actions > Deploy to DreamHost > Run workflow), create your login:
+## 4. GitHub secrets (Settings > Secrets and variables > Actions > New repository secret)
+| Name | Value |
+|---|---|
+| `DH_HOST` | `pdx1-shared-a1-04.dreamhost.com` |
+| `DH_USER` | `cashiers` |
+| `DH_PATH` | `/home/cashiers/prurientinterests.me` |
+| `DH_SSH_PRIVATE_KEY` | the private half of the deploy key |
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | the four database values from step 2 |
 
-```bash
-php bin/create-admin.php you@example.com "Your Name"
-```
+The deploy refuses to run unless `DH_PATH` is one dedicated folder with "prurient" in its name, so it can never overwrite your other websites.
 
-Then sign in at https://prurientinterests.me/admin.
+## 5. Deploy
+Push to `main`, or Actions > **Deploy to DreamHost** > Run workflow.
 
-## 4. Bring the writing in
-The Blogger posts are the master copy. Upload `feed.atom` (from the Takeout) to `storage/import/` on the server, then run these one at a time. `--dry-run` shows the counts without changing anything.
+## 6. Server tasks (buttons, not commands)
+Actions > **Server task** > Run workflow > choose a task. In this order:
+1. `check` (proves GitHub can log in)
+2. `write-env` (writes the private settings file on the server from your secrets)
+3. Run **Deploy** again so the database tables are built (or run `migrate`)
+4. `create-admin` (first add a GitHub secret `ADMIN_PASSWORD` of 12 or more characters, fill in your email and name, run it, then delete that secret)
 
-```bash
-php bin/import-blogger.php storage/import/feed.atom --dry-run
-```
+## 7. Bring the writing in
+Upload `feed.atom` and the Takeout zip (rename it `takeout.zip`) into `storage/import/` on the server with DreamHost's File Manager (or any SFTP program). Then run, one at a time, from Server task: `import-blogger-dry-run`, `import-blogger`, `import-images-dry-run`, `import-images`, `spellcheck`, `apply-spelling-preview`, `apply-spelling`. Reports (`spellcheck`, image reports) appear as downloadable files at the bottom of the run's page.
 
-```bash
-php bin/import-blogger.php storage/import/feed.atom
-```
+Every changed story keeps its old text under **Earlier versions** in the CMS. Imported gallery images are drafts until you publish them.
 
-## 4a. Bring the pictures over
-Blogger's pictures live on Google's servers. This copies them onto your own server, so they keep working. Upload the Takeout `.zip` (the big file) to `storage/import/` on the server, then:
-
-```bash
-php bin/import-images.php storage/import/takeout-20261019T211304Z-1-001.zip --dry-run
-```
-
-```bash
-php bin/import-images.php storage/import/takeout-20261019T211304Z-1-001.zip
-```
-
-Every image is checked to be a real picture and re-saved (this also removes hidden location data), and the post text is switched to the new copy. Each picture post's images also appear in the CMS under **Images** as **drafts** in draft albums named by year ("Pictures 2009"), with the creator credit filled in when the file name says "_by_Name". Nothing goes public until you publish it. The list of pictures that were not in the Takeout (hosted on other websites) is saved to `storage/reports/images-not-found.txt`.
-
-## 4b. Spell check (nothing changes until you approve it)
-This makes a report at `storage/reports/spellcheck.md` listing possible misspellings, names to confirm and doubled words:
-
-```bash
-php bin/spellcheck.php
-```
-
-Read it. Put corrections you agree with in `docs/spelling-fixes.tsv` (the word that is wrong, a Tab, the right word). Put words that are fine as written in `docs/custom-dictionary.txt`. Then preview, and apply:
-
-```bash
-php bin/apply-spelling.php
-```
-
-```bash
-php bin/apply-spelling.php --write
-```
-
-Every changed story keeps its old text under **Earlier versions** in the CMS, so a mistake can be undone.
-
-## 4c. Compare with the Word files
-Your Word files might have been edited. This only reports differences, split into "spelling or punctuation" and "wording changed", and changes nothing:
-
-```bash
-php bin/compare-docx.php storage/import/confessions.docx --split
-```
-
-```bash
-php bin/compare-docx.php storage/import/story.doc.docx --title "Exact story title"
-```
-
-## 5. Before launch
-Review every imported story in the admin, publish the ones that should go live, check the Tags list, and look at the sitemap at /sitemap.xml. Only then point DNS at DreamHost.
+## 8. Before launch
+Review the imported stories and the draft gallery in the admin, then check /sitemap.xml. Only then discuss pointing the old blogspot addresses at the new site. Nothing about the live blog changes before that.

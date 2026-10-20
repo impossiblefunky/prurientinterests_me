@@ -1,6 +1,7 @@
-# Deploys to DreamHost every time main is pushed (rsync over SSH, never FTP).
+# Deploys the site to DreamHost (rsync over SSH, never FTP) every time main is pushed, or when you press Run workflow.
 # Secrets (repo > Settings > Secrets and variables > Actions): DH_SSH_PRIVATE_KEY, DH_HOST, DH_USER, DH_PATH.
-# DH_PATH is the project folder on the server; the domain's web directory must be DH_PATH/public.
+# DH_PATH is the project folder on the server, e.g. /home/cashiers/prurientinterests.me. The website's web directory
+# in the DreamHost panel must be that folder plus /public.
 name: Deploy to DreamHost
 
 on:
@@ -17,27 +18,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check the settings before touching the server
+        env:
+          DH_HOST: ${{ secrets.DH_HOST }}
+          DH_USER: ${{ secrets.DH_USER }}
+          DH_PATH: ${{ secrets.DH_PATH }}
+          DH_KEY: ${{ secrets.DH_SSH_PRIVATE_KEY }}
+        run: |
+          for v in DH_HOST DH_USER DH_PATH DH_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::The GitHub secret for $v is missing. Add it under Settings > Secrets and variables > Actions."; exit 1; fi
+          done
+          # rsync --delete empties whatever folder it targets, so the target must be ONE dedicated folder for this site.
+          if ! printf '%s' "$DH_PATH" | grep -Eq '^/home/[a-z0-9_]+/[A-Za-z0-9._-]+$'; then
+            echo "::error::DH_PATH must look like /home/USER/FOLDER (one folder inside the home folder). Got: $DH_PATH"; exit 1
+          fi
+          if ! printf '%s' "$DH_PATH" | grep -qi 'prurient'; then
+            echo "::error::DH_PATH must contain 'prurient' so this site can never overwrite another site's folder. Got: $DH_PATH"; exit 1
+          fi
+          echo "Deploying to $DH_USER@$DH_HOST:$DH_PATH"
+
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DH_SSH_PRIVATE_KEY }}
+
       - name: Trust the DreamHost host key
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.DH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Make sure the folder exists
+        run: ssh "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}" "mkdir -p '${{ secrets.DH_PATH }}'"
+
       - name: Sync files to the server
         run: |
           rsync -az --delete \
             --exclude '.git/' --exclude '.github/' --exclude 'docs/' \
             --exclude '.env' --exclude 'vendor/' \
             --exclude 'storage/logs/*' --exclude 'storage/cache/*' --exclude 'storage/sessions/*' \
-            --exclude 'storage/secrets/*' --exclude 'storage/import/*' \
+            --exclude 'storage/secrets/*' --exclude 'storage/import/*' --exclude 'storage/reports/*' \
             --exclude 'public/uploads/' \
             ./ "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}:${{ secrets.DH_PATH }}/"
+
       - name: Install dependencies and run database migrations
         run: |
           ssh "${{ secrets.DH_USER }}@${{ secrets.DH_HOST }}" \
             "cd '${{ secrets.DH_PATH }}' && \
-             mkdir -p storage/logs storage/cache storage/sessions public/uploads && \
+             mkdir -p storage/logs storage/cache storage/sessions storage/import storage/reports public/uploads && \
              \$HOME/bin/composer install --no-dev --optimize-autoloader --no-interaction && \
-             php bin/migrate.php && \
+             if [ -f .env ]; then php bin/migrate.php; else echo 'No .env yet: skipping migrations. Run the Server task called write-env first.'; fi && \
              echo 'deployed at' \$(date -u +%Y-%m-%dT%H:%M:%SZ)"

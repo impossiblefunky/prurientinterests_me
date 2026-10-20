@@ -16,11 +16,17 @@ if (strlen($email) < 5 || !preg_match('/^[^@\s]+@[^@\s]+\.[^@\s]+$/', $email)) {
     fwrite(STDERR, "Usage: php bin/create-admin.php you@example.com \"Your Name\"\n");
     exit(1);
 }
-echo 'Password (at least 12 characters): ';
-if (PHP_OS_FAMILY !== 'Windows') { system('stty -echo'); }
+// Typed at a prompt (hidden), or piped in on standard input by the GitHub "Server task" workflow.
+$tty = function_exists('posix_isatty') && posix_isatty(STDIN);
+if ($tty) {
+    echo 'Password (at least 12 characters): ';
+    system('stty -echo');
+}
 $pw = trim((string) fgets(STDIN));
-if (PHP_OS_FAMILY !== 'Windows') { system('stty echo'); }
-echo "\n";
+if ($tty) {
+    system('stty echo');
+    echo "\n";
+}
 if (mb_strlen($pw) < 12) {
     fwrite(STDERR, "Password must be at least 12 characters.\n");
     exit(1);
