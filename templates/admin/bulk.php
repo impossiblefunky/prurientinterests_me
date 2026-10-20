@@ -1,0 +1,8 @@
+<?php /** @var array $albums @var array $errors @var int $added @var string $csrf @var array $allTags */ ?>
+<p class="meta">Choose several images at once. They are added as drafts, titled from their file names, so you can add descriptions and credits and then publish them.</p>
+<?php if ($errors): ?><div class="error" role="alert"><p>Some files could not be added<?= $added ? '. The other ' . (int) $added . ' image' . ($added === 1 ? ' was' : 's were') . ' added as drafts (see Images)' : '' ?>:</p><ul><?php foreach ($errors as $m): ?><li><?= e($m) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+<form method="post" action="/admin/gallery/upload" enctype="multipart/form-data"><input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+<div class="dropzone"><div class="field"><label for="files">Add images to the library</label><input id="files" name="files[]" type="file" multiple="multiple" required="required" accept="image/jpeg,image/png,image/webp,image/gif"><small>Batch upload. JPEG, PNG, WebP or GIF.</small></div></div>
+<div class="field"><label for="album_id">Album</label><select id="album_id" name="album_id"><?php foreach ($albums as $id => $t): ?><option value="<?= e((string) $id) ?>"><?= e($t) ?></option><?php endforeach; ?></select></div>
+<div class="field"><label for="tags">Tags</label><input id="tags" name="tags" type="text" list="taglist" autocomplete="off"><datalist id="taglist"><?php foreach ($allTags as $t): ?><option value="<?= e($t) ?>"><?php endforeach; ?></datalist><small>Separate with commas. Applied to every image in this batch.</small></div>
+<p class="actions"><button class="btn primary" type="submit">Add images</button> <a class="btn" href="/admin/gallery">Cancel</a></p></form>

@@ -23,3 +23,22 @@ th button.sort:focus-visible{outline:3px solid var(--focus)}
 .thumb{height:auto;border-radius:.3rem}
 .check{display:flex;gap:.5rem;align-items:center}
 .check input{width:1.5rem;min-height:1.5rem}
+
+/* The writing desk: sidebar plus work area, as in the CMS designs */
+body.admin main{max-width:none;margin:0;padding:1.5rem 2rem 4rem}
+.desk{display:grid;grid-template-columns:15rem minmax(0,1fr);align-items:start;max-width:96rem;margin:0 auto}
+.sidebar{padding:1.5rem 1rem;border-right:1px solid var(--line);position:sticky;top:5.5rem}
+.sidebar ul{list-style:none;margin:0 0 .75rem;padding:0}
+.sidebar li{margin:.4rem 0}
+.sidebar .navbtn{width:100%}
+.sidebar .navbtn.on{background:var(--panel);border-color:var(--rose);color:var(--text)}
+.sidebar .grp{font:700 .8rem var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:1.25rem 0 .25rem}
+.editor.has-panel{display:grid;grid-template-columns:minmax(0,1fr) 17rem;gap:2rem;align-items:start}
+.panel-col{background:var(--panel);padding:1.25rem}
+.panel-col h2{font-size:1.35rem}
+.panel-col .field input,.panel-col .field select{max-width:none}
+.boxed{border:1px solid var(--line);padding:1.25rem;margin:2rem 0;max-width:46rem}
+.dropzone{border:1px dashed var(--line);background:var(--panel);padding:1rem 1.25rem;margin:1rem 0}
+.field input[type=text],.field input[type=url],.field input[type=number],.field input[type=date],.field input[type=datetime-local],.field select,.field textarea,.field input[type=file]{max-width:none;width:100%}
+.toolbar .btn{min-height:44px}
+@media (max-width:60rem){.desk{grid-template-columns:1fr}.sidebar{position:static;border-right:0;border-bottom:1px solid var(--line)}.editor.has-panel{grid-template-columns:1fr}}

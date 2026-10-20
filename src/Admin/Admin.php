@@ -25,97 +25,170 @@ final class Admin
         $this->pdo = Db::pdo();
     }
 
+    /** @return array<string,string> id => title, with an empty first choice */
+    private function lookup(string $sql, string $none): array
+    {
+        $out = ['' => $none];
+        foreach ($this->pdo->query($sql) as $r) {
+            $out[(string) $r['id']] = $r['title'];
+        }
+        return $out;
+    }
+
     /** @return array<string,array<string,mixed>> */
     private function resources(): array
     {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
         $status = ['draft' => 'Draft', 'published' => 'Published'];
-        return [
+        $series = $this->lookup('SELECT id, title FROM series ORDER BY title', 'No series');
+        $albums = $this->lookup('SELECT id, title FROM albums ORDER BY sort_order, title', 'No album');
+        $books = $this->lookup('SELECT id, title FROM books ORDER BY title', 'Choose a book');
+        return $cache = [
             'stories' => [
-                'label' => 'Stories', 'singular' => 'story', 'table' => 'stories', 'tags' => 'story', 'revisions' => true, 'order' => 'COALESCE(published_at, created_at) DESC',
-                'columns' => ['title' => 'Title', 'status' => 'Status', 'published_at' => 'Publish date', 'word_count' => 'Words'],
+                'group' => 'Stories & posts', 'label' => 'Stories & posts', 'singular' => 'story', 'table' => 'stories', 'tags' => 'story', 'revisions' => true, 'order' => 'COALESCE(published_at, created_at) DESC',
+                'columns' => ['title' => 'Title', 'kind' => 'Type', 'status' => 'Status', 'published_at' => 'Publish date', 'word_count' => 'Words'],
+                'filters' => ['kind' => ['story' => 'Stories', 'post' => 'Posts', 'picture' => 'Pictures', 'video' => 'Videos'], 'status' => $status],
                 'fields' => [
                     ['title', 'Title', 'text', 'required' => true, 'max' => 255],
-                    ['slug', 'URL slug', 'text', 'help' => 'Leave blank to build it from the title. New stories live at /story/slug.'],
-                    ['summary', 'Summary', 'textarea', 'max' => 500, 'rows' => 3, 'help' => 'Shown on cards and in search results. Leave blank to use the opening text.'],
+                    ['summary', 'Short description', 'textarea', 'max' => 500, 'rows' => 2, 'help' => 'Shown on cards and in search results. Leave blank to use the opening text.'],
                     ['body_html', 'Story', 'html', 'required' => true],
-                    ['status', 'Status', 'select', 'options' => $status, 'help' => 'A published story with a future date stays hidden until that moment.'],
-                    ['published_at', 'Publish date', 'datetime'],
-                    ['author', 'Author name', 'text', 'max' => 120],
-                    ['legacy_path', 'Old Blogger path', 'text', 'max' => 255, 'help' => 'Only for imported stories, e.g. /2012/12/forbidden-fruit.html. Leave it alone so the old link keeps working.'],
+                    ['slug', 'URL slug', 'text', 'help' => 'Leave blank to build it from the title. New stories live at /story/slug.'],
+                    ['author', 'Author name', 'text', 'max' => 120, 'help' => 'Leave blank to use the pen name from Settings.'],
+                    ['legacy_path', 'Old Blogger path', 'text', 'max' => 255, 'help' => 'Only for imported posts, e.g. /2012/12/forbidden-fruit.html. Leave it alone so the old link keeps working.'],
                     ['cover_image', 'Cover image', 'image', 'dir' => 'covers'],
-                    ['tags', 'Tags', 'tags'],
+                    ['status', 'Status', 'select', 'options' => $status, 'panel' => true, 'help' => 'A published story with a future date stays hidden until then.'],
+                    ['published_at', 'Publish date', 'datetime', 'panel' => true],
+                    ['kind', 'Type', 'select', 'options' => ['story' => 'Story', 'post' => 'Short post', 'picture' => 'Picture post', 'video' => 'Video post'], 'panel' => true, 'help' => 'Picture and video posts stay out of the story library.'],
+                    ['series_id', 'Series', 'select', 'options' => $series, 'nullable' => true, 'panel' => true],
+                    ['chapter_order', 'Chapter order', 'number', 'panel' => true],
+                    ['featured', 'Feature on homepage', 'checkbox', 'panel' => true],
+                    ['tags', 'Interests (tags)', 'tags', 'panel' => true],
                 ],
+            ],
+            'series' => [
+                'group' => 'Stories & posts', 'label' => 'Series', 'singular' => 'series', 'table' => 'series', 'order' => 'title',
+                'list_sql' => 'SELECT s.*, (SELECT COUNT(*) FROM stories x WHERE x.series_id = s.id) AS chapters FROM series s',
+                'columns' => ['title' => 'Title', 'chapters' => 'Chapters'],
+                'fields' => [
+                    ['title', 'Series title', 'text', 'required' => true, 'max' => 255],
+                    ['slug', 'URL slug', 'text', 'help' => 'The series page lives at /series/slug.'],
+                    ['description', 'Description', 'textarea', 'max' => 500, 'rows' => 3],
+                ],
+                'help' => 'To put a story in a series, edit the story and choose the series and its chapter order.',
             ],
             'pages' => [
-                'label' => 'Pages', 'singular' => 'page', 'table' => 'pages', 'order' => 'title',
+                'group' => 'Pages & homepage', 'label' => 'Pages', 'singular' => 'page', 'table' => 'pages', 'order' => 'title',
                 'columns' => ['title' => 'Title', 'slug' => 'Slug', 'status' => 'Status'],
                 'fields' => [
-                    ['title', 'Title', 'text', 'required' => true, 'max' => 255],
-                    ['slug', 'URL slug', 'text', 'help' => 'The page lives at /slug. The slug "about" is the About page.'],
+                    ['title', 'Page or section title', 'text', 'required' => true, 'max' => 255],
+                    ['body_html', 'Copy', 'html', 'required' => true],
+                    ['slug', 'URL slug', 'text', 'help' => 'The page lives at /slug. The slug "about" (or "about-prurient-interests") is the About page.'],
                     ['legacy_path', 'Old Blogger path', 'text', 'max' => 255, 'help' => 'e.g. /p/about.html'],
-                    ['summary', 'Summary', 'textarea', 'max' => 500, 'rows' => 3],
-                    ['body_html', 'Content', 'html', 'required' => true],
+                    ['summary', 'Summary', 'textarea', 'max' => 500, 'rows' => 2],
                     ['status', 'Status', 'select', 'options' => $status],
-                ],
-            ],
-            'gallery' => [
-                'label' => 'Gallery', 'singular' => 'image', 'table' => 'gallery_items', 'tags' => 'gallery', 'order' => 'sort_order, id DESC',
-                'columns' => ['title' => 'Title', 'status' => 'Status', 'sort_order' => 'Order'],
-                'fields' => [
-                    ['title', 'Title', 'text', 'required' => true, 'max' => 255],
-                    ['file', 'Image', 'image', 'dir' => 'gallery', 'required' => true, 'extra' => ['thumb' => 'thumb', 'width' => 'width', 'height' => 'height']],
-                    ['alt_text', 'Alt text', 'text', 'required' => true, 'max' => 255, 'help' => 'Describe the image for people who cannot see it.'],
-                    ['caption', 'Caption', 'text', 'max' => 500],
-                    ['status', 'Status', 'select', 'options' => $status],
-                    ['sort_order', 'Order', 'number', 'help' => 'Lower numbers come first.'],
-                    ['tags', 'Tags', 'tags'],
-                ],
-            ],
-            'books' => [
-                'label' => 'Books', 'singular' => 'book', 'table' => 'books', 'order' => 'sort_order, id DESC',
-                'columns' => ['title' => 'Title', 'status' => 'Status', 'published_on' => 'Published'],
-                'fields' => [
-                    ['title', 'Title', 'text', 'required' => true, 'max' => 255],
-                    ['slug', 'URL slug', 'text'],
-                    ['subtitle', 'Subtitle', 'text', 'max' => 255],
-                    ['description_html', 'Description', 'html', 'required' => true],
-                    ['cover_image', 'Cover image', 'image', 'dir' => 'books'],
-                    ['buy_url', 'Buy link', 'url', 'max' => 500],
-                    ['buy_label', 'Buy button text', 'text', 'max' => 80],
-                    ['isbn', 'ISBN', 'text', 'max' => 20],
-                    ['published_on', 'Published on', 'date'],
-                    ['status', 'Status', 'select', 'options' => $status],
-                    ['sort_order', 'Order', 'number'],
-                ],
-            ],
-            'tags' => [
-                'label' => 'Tags', 'singular' => 'tag', 'table' => 'tags', 'order' => 'name',
-                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'uses' => 'Uses'],
-                'list_sql' => 'SELECT t.*, (SELECT COUNT(*) FROM item_tags i WHERE i.tag_id = t.id) AS uses FROM tags t',
-                'fields' => [
-                    ['name', 'Name', 'text', 'required' => true, 'max' => 120],
-                    ['slug', 'URL slug', 'text'],
-                    ['description', 'Description', 'textarea', 'max' => 500, 'rows' => 3, 'help' => 'Shown at the top of the tag page.'],
                 ],
             ],
             'navigation' => [
-                'label' => 'Navigation', 'singular' => 'link', 'table' => 'nav_items', 'order' => 'location, sort_order',
-                'columns' => ['label' => 'Label', 'url' => 'Link', 'location' => 'Where', 'sort_order' => 'Order'],
+                'group' => 'Pages & homepage', 'label' => 'Navigation', 'singular' => 'link', 'table' => 'nav_items', 'order' => 'location, sort_order',
+                'columns' => ['label' => 'Label', 'url' => 'Destination', 'location' => 'Where', 'sort_order' => 'Order'],
                 'fields' => [
-                    ['label', 'Label', 'text', 'required' => true, 'max' => 80],
-                    ['url', 'Link', 'text', 'required' => true, 'max' => 500, 'help' => 'A path like /stories or a full https:// address.'],
+                    ['label', 'Navigation label', 'text', 'required' => true, 'max' => 80],
+                    ['url', 'Destination', 'text', 'required' => true, 'max' => 500, 'help' => 'A path like /stories or a full https:// address.'],
                     ['location', 'Where', 'select', 'options' => ['header' => 'Header', 'footer' => 'Footer']],
-                    ['sort_order', 'Order', 'number'],
+                    ['sort_order', 'Order', 'number', 'help' => 'Lower numbers come first.'],
                     ['visible', 'Show this link', 'checkbox'],
                 ],
             ],
             'redirects' => [
-                'label' => 'Redirects', 'singular' => 'redirect', 'table' => 'redirects', 'order' => 'from_path',
-                'columns' => ['from_path' => 'From', 'to_url' => 'To', 'code' => 'Type', 'hits' => 'Hits'],
+                'group' => 'Pages & homepage', 'label' => 'Redirects', 'singular' => 'redirect', 'table' => 'redirects', 'order' => 'from_path',
+                'columns' => ['from_path' => 'Original path', 'to_url' => 'New destination', 'code' => 'Type', 'hits' => 'Hits'],
                 'fields' => [
-                    ['from_path', 'From path', 'text', 'required' => true, 'max' => 255, 'help' => 'Starts with a slash, e.g. /2012/12/old-name.html'],
-                    ['to_url', 'Send to', 'text', 'required' => true, 'max' => 500],
+                    ['from_path', 'Original Blogger path', 'text', 'required' => true, 'max' => 255, 'help' => 'Starts with a slash, e.g. /2012/12/old-name.html'],
+                    ['to_url', 'New destination', 'text', 'required' => true, 'max' => 500],
                     ['code', 'Type', 'select', 'options' => ['301' => 'Permanent (301)', '302' => 'Temporary (302)']],
+                ],
+                'help' => 'Every imported post already keeps its old address, so you only need a redirect when you change a path.',
+            ],
+            'gallery' => [
+                'group' => 'Media & galleries', 'label' => 'Images', 'singular' => 'image', 'table' => 'gallery_items', 'tags' => 'gallery', 'order' => 'sort_order, id DESC',
+                'list_sql' => 'SELECT g.*, a.title AS album FROM gallery_items g LEFT JOIN albums a ON a.id = g.album_id',
+                'columns' => ['title' => 'Title', 'album' => 'Album', 'status' => 'Status', 'sort_order' => 'Order'],
+                'bulk' => true,
+                'fields' => [
+                    ['title', 'Title', 'text', 'required' => true, 'max' => 255],
+                    ['file', 'Image', 'image', 'dir' => 'gallery', 'required' => true, 'extra' => ['thumb' => 'thumb', 'width' => 'width', 'height' => 'height']],
+                    ['caption', 'Selected image caption', 'text', 'max' => 500],
+                    ['alt_text', 'Image description / alternative text', 'text', 'required' => true, 'max' => 255, 'help' => 'Describe the image for people who cannot see it.'],
+                    ['source_url', 'Source or credit URL', 'url', 'max' => 500],
+                    ['credit', 'Photographer / creator credit', 'text', 'max' => 255],
+                    ['album_id', 'Album', 'select', 'options' => $albums, 'nullable' => true, 'panel' => true],
+                    ['sort_order', 'Display order', 'number', 'panel' => true],
+                    ['is_cover', 'Album cover image', 'checkbox', 'panel' => true],
+                    ['featured', 'Feature on homepage', 'checkbox', 'panel' => true],
+                    ['status', 'Visibility', 'select', 'options' => $status, 'panel' => true],
+                    ['tags', 'Tags', 'tags', 'panel' => true],
+                ],
+            ],
+            'albums' => [
+                'group' => 'Media & galleries', 'label' => 'Albums', 'singular' => 'album', 'table' => 'albums', 'tags' => 'album', 'order' => 'sort_order, title',
+                'list_sql' => 'SELECT a.*, (SELECT COUNT(*) FROM gallery_items g WHERE g.album_id = a.id) AS images FROM albums a',
+                'columns' => ['title' => 'Album', 'images' => 'Images', 'status' => 'Status', 'sort_order' => 'Order'],
+                'fields' => [
+                    ['title', 'Album title', 'text', 'required' => true, 'max' => 255],
+                    ['intro', 'Album introduction', 'textarea', 'max' => 500, 'rows' => 3],
+                    ['slug', 'URL slug', 'text'],
+                    ['sort_order', 'Display order', 'number', 'panel' => true],
+                    ['featured', 'Feature on homepage', 'checkbox', 'panel' => true],
+                    ['status', 'Visibility', 'select', 'options' => $status, 'panel' => true],
+                    ['tags', 'Tags', 'tags', 'panel' => true],
+                ],
+            ],
+            'books' => [
+                'group' => 'Books', 'label' => 'Books', 'singular' => 'book', 'table' => 'books', 'tags' => 'book', 'order' => 'sort_order, id DESC',
+                'columns' => ['title' => 'Title', 'status' => 'Status', 'published_on' => 'Published'],
+                'fields' => [
+                    ['title', 'Title', 'text', 'required' => true, 'max' => 255],
+                    ['cover_image', 'Cover image', 'image', 'dir' => 'books'],
+                    ['description_html', 'Description', 'html', 'required' => true],
+                    ['excerpt_html', 'Excerpt', 'html'],
+                    ['slug', 'URL slug', 'text'],
+                    ['subtitle', 'Subtitle', 'text', 'max' => 255],
+                    ['published_on', 'Published on', 'date'],
+                    ['status', 'Status', 'select', 'options' => $status, 'panel' => true],
+                    ['sort_order', 'Display order', 'number', 'panel' => true],
+                    ['featured', 'Feature on homepage', 'checkbox', 'panel' => true],
+                    ['tags', 'Tags', 'tags', 'panel' => true],
+                ],
+                'help' => 'Add editions (Paperback, Kindle, prices, purchase links, ISBN) under Editions.',
+            ],
+            'editions' => [
+                'group' => 'Books', 'label' => 'Editions', 'singular' => 'edition', 'table' => 'book_editions', 'order' => 'book_id, sort_order',
+                'list_sql' => 'SELECT e.*, b.title AS book FROM book_editions e JOIN books b ON b.id = e.book_id',
+                'columns' => ['book' => 'Book', 'name' => 'Edition', 'price_display' => 'Price', 'sort_order' => 'Order'],
+                'fields' => [
+                    ['book_id', 'Book', 'select', 'options' => $books, 'required' => true],
+                    ['name', 'Edition name', 'text', 'required' => true, 'max' => 120, 'help' => 'For example Paperback, Kindle, Audiobook.'],
+                    ['price_display', 'Display price', 'text', 'max' => 40, 'help' => 'Shown as typed. Leave blank to show no price.'],
+                    ['purchase_url', 'Purchase link', 'url', 'max' => 500],
+                    ['isbn', 'ISBN (optional)', 'text', 'max' => 20],
+                    ['sort_order', 'Order', 'number'],
+                ],
+                'help' => 'Prices and purchase links stay unset until you confirm them. Nothing is shown for a blank field.',
+            ],
+            'tags' => [
+                'group' => 'Interests', 'label' => 'Tags', 'singular' => 'tag', 'table' => 'tags', 'order' => 'name', 'aliases' => true, 'merge' => true,
+                'columns' => ['name' => 'Name', 'slug' => 'Slug', 'uses' => 'Uses', 'featured' => 'Featured'],
+                'list_sql' => 'SELECT t.*, (SELECT COUNT(*) FROM item_tags i WHERE i.tag_id = t.id) AS uses FROM tags t',
+                'fields' => [
+                    ['name', 'Canonical tag (public name)', 'text', 'required' => true, 'max' => 120],
+                    ['slug', 'URL slug', 'text'],
+                    ['description', 'Description', 'textarea', 'max' => 500, 'rows' => 3, 'help' => 'Shown at the top of the tag page.'],
+                    ['aliases', 'Tag aliases / imported Blogger labels', 'aliases', 'help' => 'Other spellings that should lead here, separated by commas. Old tag addresses keep working through redirects.'],
+                    ['featured', 'Homepage featured interest', 'checkbox'],
+                    ['sort_order', 'Order among featured interests', 'number'],
                 ],
             ],
         ];
@@ -205,7 +278,8 @@ final class Admin
 
     private function settings(string $method): void
     {
-        $names = ['site_title' => 'Site title', 'tagline' => 'Tagline', 'footer_note' => 'Footer note'];
+        $names = ['site_title' => 'Site title', 'author_name' => 'Pen name (shown on stories and books)', 'tagline' => 'Tagline', 'home_eyebrow' => 'Homepage small heading',
+            'home_headline' => 'Homepage headline', 'home_intro' => 'Homepage introduction', 'footer_note' => 'Footer note'];
         $errors = [];
         if ($method === 'POST') {
             foreach ($names as $n => $label) {
@@ -245,6 +319,14 @@ final class Admin
             $this->delete($key, $def, $id);
             return;
         }
+        if ($key === 'gallery' && ($rest[0] ?? '') === 'upload') {
+            $this->bulkUpload($method);
+            return;
+        }
+        if ($method === 'POST' && $action === 'merge' && $id && !empty($def['merge'])) {
+            $this->mergeTag($id, (int) ($_POST['target_id'] ?? 0));
+            return;
+        }
         if ($method === 'POST' && $action === 'restore' && $id && !empty($def['revisions'])) {
             $this->restore($key, $id, (int) ($rest[2] ?? 0));
             return;
@@ -269,13 +351,21 @@ final class Admin
         if ($row && !empty($def['tags'])) {
             $values['tags'] = implode(', ', $this->tagNames($def['tags'], $id));
         }
+        if ($row && !empty($def['aliases'])) {
+            $a = $this->pdo->prepare('SELECT alias_slug FROM tag_aliases WHERE tag_id = ? ORDER BY alias_slug');
+            $a->execute([$id]);
+            $values['aliases'] = implode(', ', $a->fetchAll(PDO::FETCH_COLUMN));
+        }
         if ($method === 'POST') {
             [$data, $errors] = $this->collect($key, $def, $row);
-            $values = array_merge($values, $data, ['tags' => (string) ($_POST['tags'] ?? '')]);
+            $values = array_merge($values, $data, ['tags' => (string) ($_POST['tags'] ?? ''), 'aliases' => (string) ($_POST['aliases'] ?? '')]);
             if (!$errors) {
                 $savedId = $this->save($key, $def, $id, $data, $row);
                 if (!empty($def['tags'])) {
                     $this->syncTags($def['tags'], $savedId, (string) ($_POST['tags'] ?? ''));
+                }
+                if (!empty($def['aliases'])) {
+                    $this->syncAliases($savedId, (string) ($_POST['aliases'] ?? ''), (string) $data['slug']);
                 }
                 $this->flash(ucfirst($def['singular']) . ' saved.');
                 header('Location: /admin/' . $key . '/' . $savedId, true, 303);
@@ -293,6 +383,7 @@ final class Admin
         $this->page(($id ? 'Edit ' : 'New ') . $def['singular'], View::partial('admin/form', [
             'key' => $key, 'def' => $def, 'id' => $id, 'values' => $values, 'errors' => $errors, 'csrf' => Auth::csrf(),
             'revisions' => $revisions, 'allTags' => $allTags, 'tz' => $this->tz()->getName(),
+            'mergeTargets' => $id && !empty($def['merge']) ? $this->lookupExcept('SELECT id, name AS title FROM tags WHERE id <> ' . $id . ' ORDER BY name') : [],
         ]));
     }
 
@@ -300,8 +391,18 @@ final class Admin
     private function listing(string $key, array $def): void
     {
         $sql = $def['list_sql'] ?? "SELECT * FROM {$def['table']}";
-        $rows = $this->pdo->query($sql . ' ORDER BY ' . $def['order'] . ' LIMIT 2000')->fetchAll();
-        $this->page($def['label'], View::partial('admin/list', ['key' => $key, 'def' => $def, 'rows' => $rows, 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
+        $where = [];
+        $args = [];
+        foreach ($def['filters'] ?? [] as $col => $options) {
+            $v = (string) ($_GET[$col] ?? '');
+            if ($v !== '' && array_key_exists($v, $options)) {
+                $where[] = ($def['list_sql'] ?? false ? '' : '') . "$col = ?";
+                $args[] = $v;
+            }
+        }
+        $st = $this->pdo->prepare($sql . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY ' . $def['order'] . ' LIMIT 3000');
+        $st->execute($args);
+        $this->page($def['label'], View::partial('admin/list', ['key' => $key, 'def' => $def, 'rows' => $st->fetchAll(), 'csrf' => Auth::csrf(), 'tz' => $this->tz()]));
     }
 
     // ---- data handling -------------------------------------------------------------------------------------
@@ -310,7 +411,7 @@ final class Admin
     private function defaults(string $key): array
     {
         return match ($key) {
-            'stories' => ['status' => 'draft', 'published_at' => Db::utcNow(), 'author' => ''],
+            'stories' => ['status' => 'draft', 'published_at' => Db::utcNow(), 'author' => '', 'kind' => 'story', 'chapter_order' => 1],
             'navigation' => ['visible' => 1, 'location' => 'header', 'sort_order' => 100],
             'redirects' => ['code' => 301],
             default => ['status' => 'draft', 'sort_order' => 0],
@@ -328,7 +429,7 @@ final class Admin
         $errors = [];
         foreach ($def['fields'] as $f) {
             [$name, $label, $type] = $f;
-            if ($type === 'tags') {
+            if ($type === 'tags' || $type === 'aliases') {
                 continue;
             }
             $raw = $_POST[$name] ?? '';
@@ -393,6 +494,13 @@ final class Admin
                         $errors[] = "$label has an invalid choice.";
                         continue 2;
                     }
+                    if ($val === '' && $required) {
+                        $errors[] = "$label is required.";
+                    }
+                    if (!empty($f['nullable']) || str_ends_with($name, '_id')) {
+                        $data[$name] = $val === '' ? null : (int) $val;
+                        continue 2;
+                    }
                     break;
                 default:
                     $val = trim((string) $raw);
@@ -413,7 +521,7 @@ final class Admin
         }
 
         // Per-resource rules
-        if (isset($data['slug']) || in_array($key, ['stories', 'pages', 'tags', 'books'], true)) {
+        if (isset($data['slug']) || in_array($key, ['stories', 'pages', 'tags', 'books', 'series', 'albums'], true)) {
             $base = isset($data['slug']) && $data['slug'] !== '' ? $data['slug'] : ($data['title'] ?? $data['name'] ?? '');
             $data['slug'] = $this->uniqueSlug($def['table'], slugify((string) $base), (int) ($row['id'] ?? 0));
         }
@@ -514,7 +622,7 @@ final class Admin
         if (in_array($def['table'], ['stories', 'pages', 'books'], true)) {
             $data['created_at'] = $data['updated_at'] = $now;
             array_push($cols, 'created_at', 'updated_at');
-        } elseif (in_array($def['table'], ['tags', 'gallery_items', 'redirects'], true)) {
+        } elseif (in_array($def['table'], ['tags', 'gallery_items', 'redirects', 'series', 'albums'], true)) {
             $data['created_at'] = $now;
             $cols[] = 'created_at';
         }
@@ -552,6 +660,11 @@ final class Admin
             if (!empty($def['tags'])) {
                 $this->pdo->prepare('DELETE FROM item_tags WHERE item_type = ? AND item_id = ?')->execute([$def['tags'], $id]);
             }
+            if ($key === 'series') {
+                $this->pdo->prepare('UPDATE stories SET series_id = NULL WHERE series_id = ?')->execute([$id]);
+            } elseif ($key === 'albums') {
+                $this->pdo->prepare('UPDATE gallery_items SET album_id = NULL WHERE album_id = ?')->execute([$id]);
+            }
             $this->pdo->prepare("DELETE FROM {$def['table']} WHERE id = ?")->execute([$id]);
             $this->flash(ucfirst($def['singular']) . ' deleted.');
         }
@@ -573,6 +686,99 @@ final class Admin
             $this->flash('Earlier version restored.');
         }
         header('Location: /admin/stories/' . $storyId, true, 303);
+    }
+
+    /** @return array<string,string> id => title for a query returning id and title */
+    private function lookupExcept(string $sql): array
+    {
+        $out = ['' => 'Choose a tag'];
+        foreach ($this->pdo->query($sql) as $r) {
+            $out[(string) $r['id']] = $r['title'];
+        }
+        return $out;
+    }
+
+    /** Moves everything tagged with $id onto $target, keeps the old address working as an alias, and removes the old tag. */
+    private function mergeTag(int $id, int $target): void
+    {
+        $exists = $this->pdo->prepare('SELECT slug FROM tags WHERE id = ?');
+        $exists->execute([$target]);
+        $to = $exists->fetchColumn();
+        $exists->execute([$id]);
+        $from = $exists->fetchColumn();
+        if ($target === $id || !$to || !$from) {
+            $this->flash('Choose a different tag to merge into.');
+            header('Location: /admin/tags/' . $id, true, 303);
+            return;
+        }
+        $this->pdo->beginTransaction();
+        $this->pdo->prepare('INSERT IGNORE INTO item_tags (tag_id, item_type, item_id) SELECT ?, item_type, item_id FROM item_tags WHERE tag_id = ?')->execute([$target, $id]);
+        $this->pdo->prepare('UPDATE tag_aliases SET tag_id = ? WHERE tag_id = ?')->execute([$target, $id]);
+        $this->pdo->prepare('INSERT INTO tag_aliases (alias_slug, tag_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE tag_id = VALUES(tag_id)')->execute([$from, $target]);
+        $this->pdo->prepare('DELETE FROM tags WHERE id = ?')->execute([$id]);
+        $this->pdo->commit();
+        $this->flash("Merged into that tag. The old address /tag/$from now redirects to /tag/$to.");
+        header('Location: /admin/tags/' . $target, true, 303);
+    }
+
+    private function syncAliases(int $tagId, string $csv, string $ownSlug): void
+    {
+        $this->pdo->prepare('DELETE FROM tag_aliases WHERE tag_id = ?')->execute([$tagId]);
+        foreach (explode(',', $csv) as $a) {
+            $slug = slugify(trim($a));
+            if (trim($a) === '' || $slug === $ownSlug) {
+                continue;
+            }
+            $taken = $this->pdo->prepare('SELECT COUNT(*) FROM tags WHERE slug = ?');
+            $taken->execute([$slug]);
+            if ((int) $taken->fetchColumn() === 0) {      // an alias can never shadow a real tag
+                $this->pdo->prepare('INSERT INTO tag_aliases (alias_slug, tag_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE tag_id = VALUES(tag_id)')->execute([$slug, $tagId]);
+            }
+        }
+    }
+
+    /** Add several images at once. They land as drafts so each can be described and checked before it goes public. */
+    private function bulkUpload(string $method): void
+    {
+        $albums = $this->lookup('SELECT id, title FROM albums ORDER BY sort_order, title', 'No album');
+        $errors = [];
+        $added = 0;
+        if ($method === 'POST') {
+            $album = (int) ($_POST['album_id'] ?? 0) ?: null;
+            $files = $_FILES['files'] ?? null;
+            if ($files && is_array($files['name'])) {
+                $order = (int) $this->pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM gallery_items')->fetchColumn();
+                foreach ($files['name'] as $i => $name) {
+                    if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                        continue;
+                    }
+                    if ($files['error'][$i] !== UPLOAD_ERR_OK) {
+                        $errors[] = "$name: the upload failed. Try a smaller file.";
+                        continue;
+                    }
+                    try {
+                        $img = Images::store($files['tmp_name'][$i], 'gallery');
+                    } catch (\InvalidArgumentException $e) {
+                        $errors[] = "$name: " . $e->getMessage();
+                        continue;
+                    }
+                    $title = ucfirst(trim(preg_replace('/[_\-]+|\s+/', ' ', pathinfo($name, PATHINFO_FILENAME)) ?? ''));
+                    $this->pdo->prepare('INSERT INTO gallery_items (album_id, title, alt_text, file, thumb, width, height, status, sort_order, created_at) VALUES (?,?,?,?,?,?,?,"draft",?,?)')
+                        ->execute([$album, $title !== '' ? $title : 'Untitled', $title, $img['file'], $img['thumb'], $img['width'], $img['height'], ++$order, Db::utcNow()]);
+                    $id = (int) $this->pdo->lastInsertId();
+                    $this->syncTags('gallery', $id, (string) ($_POST['tags'] ?? ''));
+                    $added++;
+                }
+            }
+            if (!$errors) {
+                $this->flash($added ? "$added image" . ($added === 1 ? '' : 's') . ' added as drafts. Add descriptions and credits, then publish them.' : 'Choose at least one image.');
+                header('Location: /admin/gallery', true, 303);
+                return;
+            }
+            http_response_code(422);
+        }
+        $this->page('Add images to the library', View::partial('admin/bulk', ['albums' => $albums, 'errors' => $errors, 'added' => $added ?? 0, 'csrf' => Auth::csrf(),
+            'allTags' => $this->pdo->query('SELECT name FROM tags ORDER BY name')->fetchAll(PDO::FETCH_COLUMN)]));
     }
 
     // ---- tags ----------------------------------------------------------------------------------------------
