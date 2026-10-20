@@ -59,7 +59,7 @@ foreach ($pdo->query("SELECT slug, description_html, excerpt_html FROM books WHE
 }
 echo number_format(count($found)) . " outside links to check.\n";
 
-/** @param list<string> $urls @return array<string,array{code:int,err:int}> */
+/** @param list<string> $urls @return array<string,array{code:int,err:int,ct:string}> */
 function probe(array $urls, bool $get, int $parallel = 25): array
 {
     $mh = curl_multi_init();
@@ -91,7 +91,7 @@ function probe(array $urls, bool $get, int $parallel = 25): array
         while ($done = curl_multi_info_read($mh)) {
             $ch = $done['handle'];
             [, $u] = $handles[(int) $ch];
-            $out[$u] = ['code' => (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), 'err' => (int) $done['result']];
+            $out[$u] = ['code' => (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), 'err' => (int) $done['result'], 'ct' => strtolower((string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE))];
             curl_multi_remove_handle($mh, $ch);
             curl_close($ch);
             unset($handles[(int) $ch]);
@@ -169,14 +169,22 @@ if ($strip || in_array('--strip-preview', $argv, true)) {
     foreach ($found as $u => $info) {
         $r = $res[$u] ?? ['code' => 0, 'err' => 28];
         $isPic = !empty($info['img']);
-        if (!$isPic && preg_match('/pornoperson|pr0noperson/i', $u)) {
-            continue;   // Mike's own profile addresses are never removed automatically (pictures are judged on their own)
+        $host = strtolower((string) parse_url($u, PHP_URL_HOST));
+        if (preg_match('/(^|\.)pornoperson\.com$/', $host)) {
+            $gone[$u] = true;   // the old pornoperson.com site is no longer Mike's; anything pointing there is dead weight
+            continue;
+        }
+        if (!$isPic && preg_match('/pornoperson|pr0noperson/i', $u) && preg_match('/(^|\.)(twitter|x|facebook|fetlife|lushstories)\.com$/', $host)) {
+            continue;   // Mike's own profile pages are never removed automatically, even when a site answers a robot oddly
         }
         if (in_array($r['code'], [404, 410], true) || ($r['code'] === 0 && $r['err'] === 6)) {
             $gone[$u] = true;
+        } elseif ($isPic && $r['code'] >= 200 && $r['code'] < 400 && str_contains((string) ($r['ct'] ?? ''), 'text/html')) {
+            $gone[$u] = true;   // the address now shows an ordinary web page (a parked or replaced site), not a picture
         } elseif ($isPic && isset($secure[$u])) {
             $r2 = $secure[$u];
-            if (in_array($r2['code'], [404, 410], true) || ($r2['code'] === 0 && in_array($r2['err'], [6, 7, 35, 51, 58, 60], true))) {
+            if (in_array($r2['code'], [404, 410], true) || ($r2['code'] === 0 && in_array($r2['err'], [6, 7, 35, 51, 58, 60], true))
+                || ($r2['code'] >= 200 && $r2['code'] < 400 && str_contains((string) ($r2['ct'] ?? ''), 'text/html'))) {
                 $gone[$u] = true;   // no usable https version: the visitor's browser cannot show it
             }
         }
