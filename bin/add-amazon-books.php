@@ -31,7 +31,7 @@ foreach ($titles as $i => $t) {
 
 // Details copied from each book's Amazon page (blurb, ASIN, publication date, length). No prices.
 $details = [
-    'meeting-max' => ['B00KZAP0Q4', '2014-06-13', 15, ['A submissive man meets up with an Dominant Male (and his female friend) and gets more than he bargained for.']],
+    'meeting-max' => ['B00KZAP0Q4', '2014-06-13', 15, ['A submissive man meets up with a Dominant Male (and his female friend) and gets more than he bargained for.']],
     'the-girl-in-the-mirror' => ['B00HT73QQC', '2014-01-10', 7, ['Adult Reading. I played it very slow with Sally. I relished the process of learning about her passions and her limits. This is the tale of the first time I used her bottom for my own purposes.']],
     'the-other-man' => ['B00C3N72E4', '2013-03-28', 16, ['Adult Material.', 'I\'m that guy. Some people call me "the other man." Others call me "Bull." I prefer to go by my real name, Eduardo.', 'I\'m the guy who, in the stories, is always in the bedroom with the wife or girlfriend getting it on in the afternoon when the husband or boyfriend comes home early from work.']],
     'dollar-store-domme' => ['B00BTR03Z0', '2013-03-13', 9, ['This girl likes her toys. I\'ve spent two decades amassing a very respectable collection. I keep several suitcases and duffel bags packed and waiting at all times. I\'ve got them at home, in my car, even one at work; each stocked with basic tools of my trade along with some personal favorites. I supplement these with additional toys depending on the client, of course.', 'Imagine my dismay when I arrive in Detroit for a special session with one of my old regulars only to find that the airline sent my bags back to Philadelphia, giving them a round trip without a stop in between. If you can\'t imagine it, you\'ll just have to trust me. I\'m freaking out.']],
@@ -43,6 +43,8 @@ $details = [
 ];
 $upBook = $pdo->prepare("UPDATE books SET description_html = ?, subtitle = ?, published_on = ?, updated_at = UTC_TIMESTAMP() WHERE slug = ? AND description_html = ''");
 $upEd = $pdo->prepare("UPDATE book_editions SET purchase_url = ?, isbn = ? WHERE book_id = ? AND name = 'Kindle Edition' AND purchase_url = ?");
+// wording fix approved by Mike (2026-10-20): "an Dominant" -> "a Dominant"
+$pdo->exec("UPDATE books SET description_html = REPLACE(description_html, 'an Dominant', 'a Dominant') WHERE slug = 'meeting-max'");
 $filled = 0;
 foreach ($details as $slug => $d) {
     $html = implode("\n", array_map(fn($p) => '<p>' . htmlspecialchars($p, ENT_NOQUOTES) . '</p>', $d[3]));
