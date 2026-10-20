@@ -1,7 +1,9 @@
 <?php /** @var array $s */
-$mins = reading_minutes((int) $s['word_count']); ?>
-<article class="card">
-  <h3><a href="<?= e(story_url($s)) ?>"><?= e($s['title']) ?></a></h3>
-  <p class="meta"><time datetime="<?= e(gmdate('Y-m-d', strtotime($s['published_at'] . ' UTC'))) ?>"><?= e(format_date($s['published_at'])) ?></time> &middot; <?= $mins ?> min read</p>
-  <p><?= e($s['summary'] !== '' ? $s['summary'] : excerpt($s['body_html'], 200)) ?></p>
+$isSeries = !empty($s['series_id']); ?>
+<article class="entry">
+  <p class="eyebrow"><?= $isSeries ? 'Series' : ($s['kind'] === 'video' ? 'Video' : 'Standalone') ?></p>
+  <h3><a href="<?= e(story_url($s)) ?>"><?= e($isSeries ? $s['series_title'] : $s['title']) ?></a></h3>
+  <p class="summary"><?= e($s['summary'] !== '' ? $s['summary'] : excerpt($s['body_html'], 170)) ?></p>
+  <p class="meta"><?= e(card_meta($s)) ?></p>
+  <p><a class="btn" href="<?= e(story_url($s)) ?>"><?= $isSeries ? 'Begin with chapter one' : 'Read the story' ?> &rarr;</a></p>
 </article>

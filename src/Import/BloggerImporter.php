@@ -113,8 +113,9 @@ final class BloggerImporter
     private function labels(int $storyId, array $labels): void
     {
         $this->pdo->prepare('DELETE FROM item_tags WHERE item_type = "story" AND item_id = ?')->execute([$storyId]);
-        foreach ($labels as $name) {
-            $slug = slugify($name);
+        foreach ($labels as $label) {
+            $slug = slugify($label);
+            $name = self::tagName($label);
             $st = $this->pdo->prepare('SELECT id FROM tags WHERE slug = ?');
             $st->execute([$slug]);
             $tagId = $st->fetchColumn();
@@ -138,6 +139,17 @@ final class BloggerImporter
         if (in_array('youtube', $l, true) && $words < 150) { return 'video'; }
         if ($words < 60 && preg_match('/<img\b/i', $body)) { return 'picture'; }
         return $words >= 400 ? 'story' : 'post';
+    }
+
+    /** Blogger labels are often all lower case; show them capitalised, keeping labels that already have capitals. */
+    public static function tagName(string $label): string
+    {
+        $label = trim($label);
+        if ($label !== mb_strtolower($label)) {
+            return $label;
+        }
+        $special = ['m2m' => 'M2M', 'bdsm' => 'BDSM', 'bdsm terms' => 'BDSM terms'];
+        return $special[$label] ?? mb_strtoupper(mb_substr($label, 0, 1)) . mb_substr($label, 1);
     }
 
     /** Blogger separates paragraphs with <br><br>; turn that into real <p> elements. */

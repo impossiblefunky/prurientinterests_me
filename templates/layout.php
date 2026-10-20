@@ -1,17 +1,17 @@
-<?php
-/** @var string $content @var array $meta @var array $d */
+<?php /** @var string $content @var array $meta @var array $d */
 $title = $meta['title'] ?? setting('site_title');
 $desc = $meta['description'] ?? '';
 $canon = $meta['canonical'] ?? null;
 $robots = $meta['robots'] ?? null;
 $crumbs = $meta['breadcrumbs'] ?? [];
 $jsonld = $meta['jsonld'] ?? [];
+$here = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 if ($crumbs) {
-    $items = [['Home', '/']];
-    foreach ($crumbs as $c) { $items[] = $c; }
+    $items = array_merge([['Home', '/']], $crumbs);
     $jsonld[] = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => array_map(
         fn($c, $i) => ['@type' => 'ListItem', 'position' => $i + 1, 'name' => $c[0], 'item' => site_url($c[1])], $items, array_keys($items))];
 }
+$current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || str_starts_with($here, rtrim($url, '/') . '/'));
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -39,9 +39,9 @@ if ($crumbs) {
 <a class="skip" href="#main">Skip to main content</a>
 <?php if (empty($meta['bare'])): ?>
 <header class="site-header">
-  <a class="brand" href="/"><?= e(setting('site_title')) ?></a>
+  <a class="brand" href="/"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag"><?= e(setting('tagline')) ?></span></a>
   <nav aria-label="Main"><ul>
-    <?php foreach ($d['nav']['header'] as $n): ?><li><a href="<?= e($n['url']) ?>"><?= e($n['label']) ?></a></li>
+    <?php foreach ($d['nav']['header'] as $n): ?><li><a class="navbtn" href="<?= e($n['url']) ?>"<?= $current($n['url']) ? ' aria-current="page"' : '' ?>><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>
   </ul></nav>
 </header>
@@ -58,13 +58,14 @@ if ($crumbs) {
 </main>
 <?php if (empty($meta['bare'])): ?>
 <footer class="site-footer">
+  <p><strong><?= e(setting('site_title')) ?> · <?= e(setting('author_name')) ?></strong><br>A personal archive, since 2006</p>
   <nav aria-label="Footer"><ul>
     <?php foreach ($d['nav']['footer'] as $n): ?><li><a href="<?= e($n['url']) ?>"><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>
-    <li><a href="/leave">Leave site</a></li>
-  </ul></nav>
-  <p><?= e(setting('footer_note')) ?></p>
+    <li><a href="/tags">Interests</a></li><li><a href="/stories">Stories</a></li><li><a href="/gallery">Gallery</a></li><li><a href="/books">Books</a></li><li><a href="/leave">Leave site</a></li>
+  </ul><p><?= e(setting('footer_note')) ?></p></nav>
 </footer>
 <?php endif; ?>
+<script src="/assets/site.js" defer></script>
 </body>
 </html>

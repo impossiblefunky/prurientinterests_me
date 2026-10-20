@@ -90,3 +90,43 @@ function text_to_html(string $text): string
     }
     return $out;
 }
+
+/** Query string for pager and filter links: current filters merged with overrides; empty values and page 1 are dropped. */
+function qs(array $cur, array $over = []): string
+{
+    $all = array_filter($over + $cur, fn($v) => $v !== null && $v !== '' && $v !== 1 && $v !== 0);
+    return $all ? '?' . http_build_query($all) : '';
+}
+
+/** Story text for display: outside links open in a new tab and say so to screen readers. */
+function prose(string $html): string
+{
+    return preg_replace_callback('#<a href="(https?://[^"]+)"(?: rel="noopener")?>(.*?)</a>#is', function (array $m): string {
+        $host = parse_url($m[1], PHP_URL_HOST);
+        $mine = parse_url((string) \App\Support\Env::get('APP_URL', ''), PHP_URL_HOST);
+        if ($host && $mine && strcasecmp($host, $mine) === 0) {
+            return '<a href="' . $m[1] . '">' . $m[2] . '</a>';
+        }
+        return '<a href="' . $m[1] . '" target="_blank" rel="noopener noreferrer">' . $m[2] . '<span class="sr-only"> (opens in a new tab)</span></a>';
+    }, $html) ?? $html;
+}
+
+/** "Standalone · 2026 · 8 min read" or "Series · 2020 · 4 chapters". */
+function card_meta(array $s): string
+{
+    $year = gmdate('Y', strtotime($s['published_at'] . ' UTC'));
+    if (!empty($s['series_id'])) {
+        $n = (int) $s['chapters'];
+        return "Series · $year · $n chapter" . ($n === 1 ? '' : 's');
+    }
+    return "Standalone · $year · " . reading_minutes((int) $s['word_count']) . ' min read';
+}
+
+/** A book cover: the uploaded image, or a typeset placeholder card when there is none. */
+function View_cover(array $b): string
+{
+    if (!empty($b['cover_image'])) {
+        return '<img class="cover" src="/uploads/' . e($b['cover_image']) . '" alt="Cover of ' . e($b['title']) . '" width="200" loading="lazy">';
+    }
+    return '<div class="cover placeholder" role="img" aria-label="' . e($b['title']) . ' by ' . e(setting('author_name')) . '"><span class="eyebrow">' . e(setting('author_name')) . '</span><span class="cover-title">' . e($b['title']) . '</span></div>';
+}
