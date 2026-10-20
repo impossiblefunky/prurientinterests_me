@@ -15,7 +15,10 @@ use PDO;
 final class BloggerImporter
 {
     /** @var array<string,int> */
-    public array $counts = ['stories' => 0, 'drafts' => 0, 'pages' => 0, 'comments' => 0, 'skipped' => 0, 'external_images' => 0];
+    public array $counts = ['stories' => 0, 'drafts' => 0, 'pages' => 0, 'books' => 0, 'comments' => 0, 'skipped' => 0, 'external_images' => 0, 'internal_links' => 0];
+
+    /** Blogger pages that are really books: they become entries on the Books page (slug => display order). */
+    private const BOOK_PAGES = ['freedom-is-slavery' => 1, 'life-on-my-knees' => 2];
 
     private PDO $pdo;
 
@@ -61,7 +64,7 @@ final class BloggerImporter
         $isLive = $e['status'] === 'LIVE';
         $isDraft = $e['status'] === 'DRAFT';
         if (!$isLive && !$isDraft) { $this->counts['skipped']++; return null; }
-        $body = self::paragraphize(HtmlSanitizer::clean($e['content']));
+        $body = $this->internalLinks(self::paragraphize(HtmlSanitizer::clean($e['content'])));
         $this->counts['external_images'] += preg_match_all('/<img\b[^>]*\bsrc="https?:/i', $body);
         $legacy = $isLive && preg_match('#^/\d{4}/\d{2}/[^/]+\.html$#', $e['filename']) ? $e['filename'] : null;
         $title = trim($e['title']) !== '' ? trim($e['title']) : 'Untitled';
@@ -93,12 +96,19 @@ final class BloggerImporter
     private function page(array $e): void
     {
         if ($e['status'] !== 'LIVE' && $e['status'] !== 'DRAFT') { $this->counts['skipped']++; return; }
-        $this->counts['pages']++;
-        if ($this->dryRun) { return; }
         $legacy = preg_match('#^/p/[^/]+\.html$#', $e['filename']) ? $e['filename'] : null;
         $slug = $legacy ? preg_replace('/\.html$/', '', basename($legacy)) : slugify($e['title']);
+        if (isset(self::BOOK_PAGES[$slug])) {
+            $this->counts['books']++;
+            if (!$this->dryRun) {
+                $this->bookFromPage($e, $slug, $legacy);
+            }
+            return;
+        }
+        $this->counts['pages']++;
+        if ($this->dryRun) { return; }
         $now = Db::utcNow();
-        $body = self::paragraphize(HtmlSanitizer::clean($e['content']));
+        $body = $this->internalLinks(self::paragraphize(HtmlSanitizer::clean($e['content'])));
         $st = $this->pdo->prepare('SELECT id FROM pages WHERE legacy_path <=> ? OR slug = ?');
         $st->execute([$legacy, $slug]);
         if ($id = $st->fetchColumn()) {
@@ -107,6 +117,62 @@ final class BloggerImporter
             $this->pdo->prepare('INSERT INTO pages (slug, legacy_path, title, body_html, status, source_html, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)')
                 ->execute([$slug, $legacy, $e['title'], $body, $e['status'] === 'LIVE' ? 'published' : 'draft', $e['content'], $now, $now]);
         }
+    }
+
+    /**
+     * Turns a Blogger book page into an entry on the Books page: the buy links become editions (Paperback, eBook),
+     * the ISBN is read from the spec table, and the old /p/ address redirects to /books. An existing book is never overwritten.
+     * @param array<string,mixed> $e
+     */
+    private function bookFromPage(array $e, string $slug, ?string $legacy): void
+    {
+        $now = Db::utcNow();
+        $body = $this->internalLinks(self::paragraphize(HtmlSanitizer::clean($e['content'])));
+        $editions = [];
+        $body = preg_replace_callback('#<a href="([^"]+)"[^>]*>\s*<strong>\s*(Buy[^<]*)</strong>\s*</a>#i', function (array $m) use (&$editions): string {
+            $name = stripos($m[2], 'ebook') !== false ? 'eBook' : 'Paperback';
+            $editions[$name] ??= html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return '';
+        }, $body) ?? $body;
+        $body = trim(preg_replace('#(?:<p>\s*</p>\s*)+#', '', $body) ?? $body);
+        $isbn = preg_match('#ISBN:</td>\s*<td>\s*([0-9Xx\- ]{10,20})\s*</td>#', $body, $im) ? trim($im[1]) : '';
+        $exists = $this->pdo->prepare('SELECT id FROM books WHERE slug = ?');
+        $exists->execute([$slug]);
+        if (!$exists->fetchColumn()) {
+            $this->pdo->prepare('INSERT INTO books (slug, title, description_html, status, sort_order, isbn, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)')
+                ->execute([$slug, trim($e['title']), $body, $e['status'] === 'LIVE' ? 'published' : 'draft', self::BOOK_PAGES[$slug], $isbn, $now, $now]);
+            $bookId = (int) $this->pdo->lastInsertId();
+            $order = 0;
+            foreach ($editions as $name => $url) {
+                $this->pdo->prepare('INSERT INTO book_editions (book_id, name, purchase_url, isbn, sort_order) VALUES (?,?,?,?,?)')
+                    ->execute([$bookId, $name, $url, $name === 'Paperback' ? $isbn : '', $order++]);
+            }
+        }
+        if ($legacy) {
+            $this->pdo->prepare('INSERT INTO redirects (from_path, to_url, code, created_at) VALUES (?,?,301,?) ON DUPLICATE KEY UPDATE to_url = VALUES(to_url)')
+                ->execute([$legacy, '/books#' . $slug, $now]);
+        }
+    }
+
+    /** Links to this blog's own posts, pages and labels at the old addresses become links within the new site. */
+    public function internalLinks(string $html): string
+    {
+        return preg_replace_callback('#href="https?://(?:www\.)?(?:pornoperson\.blogspot\.com|pornoperson\.com|prurientinterests\.me)(/[^"]*)?"#i', function (array $m): string {
+            $path = preg_replace('/[?#].*$/', '', html_entity_decode($m[1] ?? '/', ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '/';
+            if (preg_match('#^/\d{4}/\d{2}/[^/]+\.html$#', $path) || preg_match('#^/p/[^/]+\.html$#', $path)) {
+                $this->counts['internal_links']++;
+                return 'href="' . $path . '"';
+            }
+            if (preg_match('#^/search/label/([^/]+)#', $path, $l)) {
+                $this->counts['internal_links']++;
+                return 'href="/tag/' . slugify(rawurldecode($l[1])) . '"';
+            }
+            if ($path === '/' || $path === '') {
+                $this->counts['internal_links']++;
+                return 'href="/"';
+            }
+            return $m[0];
+        }, $html) ?? $html;
     }
 
     /** @param list<string> $labels */
