@@ -238,3 +238,13 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .notice ul{margin:.5rem 0 0 1.25rem;padding:0}
 .turnstile-wrap{margin:.5rem 0 1rem}
 .comment-form{max-width:46rem;margin-top:2rem}
+
+/* Contact page: form left, links right, on the 12-column grid */
+.contact-page{grid-column:1/-1}
+.contact-cols{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:var(--gutter);row-gap:2.5rem;align-items:start}
+.contact-main{grid-column:1 / span 7}
+.contact-side{grid-column:9 / span 4;border-left:1px solid var(--line-soft);padding-left:var(--gutter)}
+.contact-side h2,.contact-main h2{font-size:1.5rem}
+.contact-side .prose{font-size:1.1rem;line-height:1.7}
+.contact-side .prose p{margin:0 0 1rem}
+@media (max-width:64rem){.contact-main,.contact-side{grid-column:1/-1}.contact-side{border-left:0;padding-left:0;border-top:1px solid var(--line-soft);padding-top:1.5rem}}

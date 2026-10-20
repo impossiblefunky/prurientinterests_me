@@ -50,4 +50,18 @@ foreach (['kitty', 'desires', 'karma', 'bully'] as $slug) {
     }
 }
 echo "Tags tidied (renamed, hidden, dropped).\n";
+// The Contact page no longer lists an email address (the form replaces it).
+$row = $pdo->query("SELECT id, body_html FROM pages WHERE slug = 'contact'")->fetch();
+$removed = 0;
+if ($row && stripos($row['body_html'], 'Email me at') !== false) {
+    $body = preg_replace('#<p>Email me at.*?</p>(\s*<br\s*/?>)?#is', '', $row['body_html']);
+    $pdo->prepare('UPDATE pages SET body_html = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$body, $row['id']]);
+    $removed = 1;
+}
+echo "Contact page email line removed: $removed\n";
+// FetLife line becomes a real link (Mike's address).
+$fl = $pdo->prepare("UPDATE pages SET body_html = REPLACE(body_html, 'Look for me on Fetlife.', 'Look for me on <a href=\"https://fetlife.com/pornoperson\">FetLife</a>.'), updated_at = UTC_TIMESTAMP() WHERE slug = 'contact' AND body_html LIKE '%Look for me on Fetlife.%'");
+$fl->execute();
+echo "FetLife link added: " . $fl->rowCount() . "\n";
+
 echo "Done.\n";

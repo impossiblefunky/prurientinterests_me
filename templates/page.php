@@ -1,9 +1,17 @@
 <?php /** @var array $p @var bool $isAbout @var bool $hasContact @var bool $hasBooks @var array $form */ ?>
+<?php if ($p['slug'] === 'contact'): ?>
+<article class="contact-page">
+  <h1><?= e($p['title']) ?></h1>
+  <div class="contact-cols">
+    <div class="contact-main"><?php include __DIR__ . '/partials/contact_form.php'; ?></div>
+    <aside class="contact-side" aria-labelledby="elsewhere-h"><h2 id="elsewhere-h">Elsewhere</h2><div class="prose"><?= prose($p['body_html']) ?></div></aside>
+  </div>
+</article>
+<?php return; endif; ?>
 <article class="reading">
   <?php if ($isAbout): ?><p class="eyebrow">Behind the collection</p><?php endif; ?>
   <h1><?= e($p['title']) ?></h1>
   <div class="prose"><?= prose($p['body_html']) ?></div>
-  <?php if ($p['slug'] === 'contact') { include __DIR__ . '/partials/contact_form.php'; } ?>
   <?php if ($isAbout): ?>
   <section aria-labelledby="way-h"><h2 id="way-h">Find your way in</h2>
     <p class="actions"><a class="btn" href="/stories">Explore the stories</a><?php if ($hasBooks): ?> <a class="btn" href="/books">Browse the books</a><?php endif; ?></p>
