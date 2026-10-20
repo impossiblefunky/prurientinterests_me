@@ -23,6 +23,10 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <meta name="rating" content="adult">
 <?php if ($robots): ?><meta name="robots" content="<?= e($robots) ?>">
 <?php endif; ?>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0f0d10">
 <link rel="alternate" type="application/atom+xml" title="<?= e(setting('site_title')) ?>" href="/feed">
 <?php if ($canon): ?><link rel="canonical" href="<?= e($canon) ?>">
 <?php endif; ?>
@@ -46,7 +50,7 @@ $current = fn(string $url) => $url === '/' ? $here === '/' : ($here === $url || 
 <?php if (empty($meta['bare'])): ?>
 <header class="site-header">
   <a class="brand" href="/"><span class="brand-name"><?= e(setting('site_title')) ?></span><span class="brand-tag"><?= e(setting('tagline')) ?></span></a>
-  <form class="site-search" method="get" action="/search" role="search"><label for="hq" class="sr-only">Search the site</label><input id="hq" name="q" type="search" placeholder="Search…" value="<?= e((string) ($_GET['q'] ?? '')) ?>"><button class="btn" type="submit">Search</button></form>
+  <form class="site-search" method="get" action="/search" role="search"><label for="hq" class="sr-only">Search the site</label><input id="hq" name="q" type="search" placeholder="Search…" value="<?= e((string) ($_GET['q'] ?? '')) ?>"><button class="btn primary search-btn" type="submit"><svg class="search-icon" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 4.5 4.5"/></svg>Search</button></form>
   <nav aria-label="Main"><ul>
     <?php foreach ($d['nav']['header'] as $n): ?><li><a class="navbtn" href="<?= e($n['url']) ?>"<?= $current($n['url']) ? ' aria-current="page"' : '' ?>><?= e($n['label']) ?></a></li>
     <?php endforeach; ?>
