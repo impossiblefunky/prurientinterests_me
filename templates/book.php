@@ -8,8 +8,8 @@ $buy = array_values(array_filter($book['editions'], fn($e) => $e['purchase_url']
     <?php if ($book['subtitle'] !== ''): ?><p class="meta"><?= e($book['subtitle']) ?></p><?php endif; ?>
     <?php if ($buy): ?>
     <h2 class="small">Where to get it</h2>
-    <ul class="buy-list"><?php foreach ($buy as $ed): ?>
-      <li><a class="btn primary" href="<?= e($ed['purchase_url']) ?>" target="_blank" rel="noopener noreferrer sponsored"><?= ext_label(e(buy_label($ed))) ?></a><?= $ed['price_display'] !== '' || $ed['isbn'] !== '' ? ' <span class="meta">' . e(trim(($ed['price_display'] !== '' ? $ed['price_display'] : '') . ($ed['isbn'] !== '' ? ' · ISBN ' . $ed['isbn'] : ''), ' ·')) . '</span>' : '' ?></li>
+    <ul class="buy-list"><?php foreach ($buy as $ed): $fine = trim(($ed['price_display'] !== '' ? $ed['price_display'] : '') . ($ed['isbn'] !== '' ? ($ed['price_display'] !== '' ? ' · ' : '') . 'ISBN ' . preg_replace('/[^0-9Xx]/', '', (string) $ed['isbn']) : '')); ?>
+      <li><a class="btn primary" href="<?= e($ed['purchase_url']) ?>" target="_blank" rel="noopener noreferrer sponsored"><?= ext_label(e(buy_label($ed))) ?></a><?php if ($fine !== ''): ?><span class="meta"><?= e($fine) ?></span><?php endif; ?></li>
     <?php endforeach; ?></ul>
     <?php if (has_amazon_link([$book])): ?><p class="meta">As an Amazon Associate I earn from qualifying purchases.</p><?php endif; ?>
     <?php endif; ?>

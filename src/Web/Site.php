@@ -363,7 +363,7 @@ final class Site
         $url = site_url(story_url($s));
         $author = $s['author'] !== '' ? $s['author'] : setting('author_name', setting('site_title'));
         $this->send('story', ['s' => $s, 'tags' => $tags, 'related' => $rel->fetchAll(), 'prev' => $prev, 'next' => $next, 'chapters' => $chapters, 'author' => $author, 'comments' => $comments, 'form' => $this->form], [
-            'title' => $s['title'] . ' | ' . setting('site_title'),
+            'title' => $s['title'] . $this->sameTitleYear($s) . ' | ' . setting('site_title'),
             'description' => $desc,
             'canonical' => $url,
             'og_type' => 'article',
@@ -495,6 +495,14 @@ final class Site
             'robots' => 'noindex,follow',
             'breadcrumbs' => [['Search', '/search']],
         ]);
+    }
+
+    /** " (2009)" when another published story has exactly this title, so every page keeps its own search-result title. */
+    private function sameTitleYear(array $s): string
+    {
+        $st = Db::pdo()->prepare('SELECT COUNT(*) FROM stories WHERE title = ? AND status = "published" AND id <> ?');
+        $st->execute([$s['title'], $s['id']]);
+        return (int) $st->fetchColumn() > 0 ? ' (' . gmdate('Y', strtotime($s['published_at'] . ' UTC')) . ')' : '';
     }
 
     /** @return list<array<string,mixed>> published books with their editions */
@@ -683,12 +691,14 @@ final class Site
             return;
         }
         $path = $p['legacy_path'] ?: '/' . $p['slug'];
+        // Contact and About answer at their old Blogger address and at a clean one; search engines are told the clean one.
+        $clean = $p['slug'] === 'contact' ? '/contact' : (str_starts_with($p['slug'], 'about') ? '/about' : $path);
         $has = fn(string $slug) => (bool) Db::pdo()->query('SELECT 1 FROM pages WHERE status = "published" AND slug = ' . Db::pdo()->quote($slug))->fetchColumn();
         $this->send('page', ['form' => $this->form, 'p' => $p, 'isAbout' => str_starts_with($p['slug'], 'about'), 'hasContact' => $has('contact'), 'hasBooks' => (bool) Db::pdo()->query('SELECT 1 FROM books WHERE status = "published" LIMIT 1')->fetchColumn()], [
             'title' => $p['title'] . ' | ' . setting('site_title'),
-            'description' => $p['summary'] !== '' ? $p['summary'] : excerpt($p['body_html']),
-            'canonical' => site_url($path),
-            'breadcrumbs' => [[$p['title'], $path]],
+            'description' => $p['summary'] !== '' ? $p['summary'] : ($p['slug'] === 'contact' ? 'Send a message to ' . setting('author_name', setting('site_title')) . ', or find him elsewhere online.' : excerpt($p['body_html'])),
+            'canonical' => site_url($clean),
+            'breadcrumbs' => [[$p['title'], $clean]],
         ]);
     }
 

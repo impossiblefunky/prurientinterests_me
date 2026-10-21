@@ -62,6 +62,7 @@ function reading_minutes(int $words): int
 
 function excerpt(string $html, int $chars = 160): string
 {
+    $html = preg_replace('#</(?:p|div|li|h[1-6]|tr|td|blockquote)>|<br\s*/?>#i', ' ', $html) ?? $html;   // keep words from running together
     $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
     if (mb_strlen($text) <= $chars) {
         return $text;
@@ -209,14 +210,16 @@ function asset(string $path): string
 function buy_label(array $ed): string
 {
     $host = strtolower((string) parse_url((string) $ed['purchase_url'], PHP_URL_HOST));
+    // Only name a store when the address says so. A short link (bit.ly) says nothing, so the button just says what the edition is.
     $where = match (true) {
-        str_contains($host, 'amazon.') || $host === 'amzn.to' || $host === 'a.co' => 'Amazon',
-        str_contains($host, 'lulu.') || $host === 'bit.ly' => 'Lulu',
-        default => preg_replace('/^www\./', '', $host) ?: 'the store',
+        str_contains($host, 'amazon.') || $host === 'amzn.to' || $host === 'a.co' => ' on Amazon',
+        str_contains($host, 'lulu.') => ' on Lulu',
+        in_array($host, ['bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co'], true) || $host === '' => '',
+        default => ' on ' . (preg_replace('/^www\./', '', $host) ?: 'the store'),
     };
     $name = trim((string) $ed['name']);
-    $name = stripos($name, 'edition') === false ? $name . ' edition' : $name;
-    return 'Buy ' . $name . ' on ' . $where;
+    $name = stripos($name, 'edition') === false ? $name . ' edition' : preg_replace('/\bEdition\b/', 'edition', $name);
+    return 'Buy ' . $name . $where;
 }
 
 /** True when any purchase link goes to Amazon (so the Associates notice is shown). */

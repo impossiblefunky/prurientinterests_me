@@ -175,4 +175,26 @@ if ((int) $pdo->query('SELECT COUNT(*) FROM tags WHERE featured = 1')->fetchColu
     echo "Homepage interests chosen: M2M, Domme, Fetish, Dom, Feminization, Cuckold, Bondage, Transsexual\n";
 }
 
+// Both paperbacks are sold on Amazon (the old bit.ly links lead there, one with another affiliate tag). Use direct Amazon links with Mike's tag.
+$fix = $pdo->prepare('UPDATE book_editions SET purchase_url = ? WHERE purchase_url LIKE ?');
+$swaps = 0;
+foreach ([['https://www.amazon.com/dp/1435749901?tag=proboothcas0f-20', 'http://bit.ly/a9rNmM%'], ['https://www.amazon.com/dp/0557207096?tag=proboothcas0f-20', 'http://bit.ly/7MKzm6%']] as [$to, $like]) {
+    $fix->execute([$to, $like]);
+    $swaps += $fix->rowCount();
+}
+echo "Paperback links changed to direct Amazon links: $swaps\n";
+
+// Links that go nowhere (an empty address or just #) are removed, keeping the words.
+$nowhere = 0;
+$updN = $pdo->prepare('UPDATE stories SET body_html = ? WHERE id = ?');
+foreach ($pdo->query("SELECT id, body_html FROM stories WHERE body_html LIKE '%href=\"#\"%' OR body_html LIKE '%href=\"\"%'")->fetchAll() as $r) {
+    $new = preg_replace('#<a\b[^>]*\bhref="(?:|\#)"[^>]*>(.*?)</a>#is', '$1', $r['body_html'], -1, $n) ?? $r['body_html'];
+    if ($n) {
+        $pdo->prepare('INSERT INTO story_revisions (story_id, title, body_html, saved_at) SELECT id, title, body_html, UTC_TIMESTAMP() FROM stories WHERE id = ?')->execute([$r['id']]);
+        $updN->execute([$new, $r['id']]);
+        $nowhere += $n;
+    }
+}
+echo "Links that went nowhere removed: $nowhere\n";
+
 echo "Done.\n";

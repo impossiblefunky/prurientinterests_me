@@ -288,7 +288,9 @@ html.paper mark{background:#f2d27a;color:#241b20}
 .catalog-cover{flex:none;width:7.5rem;display:block}
 .catalog-cover .cover{width:100%;height:auto;display:block}
 .catalog-cover .cover.placeholder{aspect-ratio:2/3}
-.buy-list{list-style:none;margin:.5rem 0 1rem;padding:0;display:flex;flex-direction:column;gap:.6rem;align-items:flex-start}
+.buy-list{list-style:none;margin:.5rem 0 1rem;padding:0;display:flex;flex-direction:column;gap:1rem;align-items:flex-start}
+.buy-list li{display:flex;flex-direction:column;gap:.3rem;align-items:flex-start;max-width:100%}
+.buy-list .btn{white-space:normal;text-align:left;max-width:100%}
 @media (max-width:64rem){.catalog-item{grid-column:1 / -1}}
 @media (max-width:30rem){.catalog-cover{width:5.5rem}}
 
