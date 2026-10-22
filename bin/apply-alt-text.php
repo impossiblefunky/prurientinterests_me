@@ -42,6 +42,16 @@ $tagId = function (string $name) use ($findTag, $newTag, $pdo): int {
     return (int) $id;
 };
 
+// Tags listed in config/alt-text/retired-tags.txt are taken off a picture when its line no longer lists them, so a tag
+// can be split into finer ones. Only pictures that have a line in the files are touched.
+$retired = [];
+$retiredFile = Env::root() . '/config/alt-text/retired-tags.txt';
+if (is_file($retiredFile)) {
+    $retired = array_filter(array_map('trim', file($retiredFile, FILE_IGNORE_NEW_LINES)));
+}
+$unlink = $pdo->prepare("DELETE FROM item_tags WHERE tag_id = ? AND item_type = 'gallery' AND item_id = ?");
+$tagsRemoved = 0;
+
 $pictures = $matched = $altSet = $altKept = $tagLinks = $unmatched = $crowded = 0;
 foreach (glob(Env::root() . '/config/alt-text/*.tsv') ?: [] as $file) {
     foreach (file($file, FILE_IGNORE_NEW_LINES) as $line) {
@@ -79,7 +89,17 @@ foreach (glob(Env::root() . '/config/alt-text/*.tsv') ?: [] as $file) {
             } else {
                 $altKept++;
             }
-            foreach (array_filter(array_map('trim', explode(',', $tags))) as $name) {
+            $wanted = array_filter(array_map('trim', explode(',', $tags)));
+            foreach ($retired as $old) {
+                if (!in_array($old, $wanted, true)) {
+                    $findTag->execute([slugify($old)]);
+                    if ($oldId = $findTag->fetchColumn()) {
+                        $unlink->execute([$oldId, $r['id']]);
+                        $tagsRemoved += $unlink->rowCount();
+                    }
+                }
+            }
+            foreach ($wanted as $name) {
                 $link->execute([$tagId($name), $r['id']]);
                 $tagLinks += $link->rowCount();
             }
@@ -90,5 +110,5 @@ printf("Pictures in the files: %d\nFound on the site: %d\nNot found: %d\nSkipped
 if ($preview) {
     echo "Preview only: nothing was written.\n";
 } else {
-    printf("Alt text written: %d (kept hand-written alt text: %d)\nNew tag links: %d\n", $altSet, $altKept, $tagLinks);
+    printf("Alt text written: %d (kept hand-written alt text: %d)\nNew tag links: %d\nOld tag links removed: %d\n", $altSet, $altKept, $tagLinks, $tagsRemoved);
 }
