@@ -41,6 +41,8 @@ on:
           - retire-elust
           - apply-alt-text-preview
           - apply-alt-text
+          - relabel-gallery-preview
+          - relabel-gallery
           - add-amazon-books
           - import-images-dry-run
           - import-images
@@ -170,6 +172,10 @@ jobs:
               remote "\$PHP bin/apply-alt-text.php --preview" ;;
             apply-alt-text)
               remote "\$PHP bin/apply-alt-text.php" ;;
+            relabel-gallery-preview)
+              remote "\$PHP bin/relabel-gallery.php --preview" ;;
+            relabel-gallery)
+              remote "\$PHP bin/relabel-gallery.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)
