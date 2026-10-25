@@ -43,6 +43,8 @@ on:
           - apply-alt-text
           - relabel-gallery-preview
           - relabel-gallery
+          - hide-duplicates-preview
+          - hide-duplicates
           - add-amazon-books
           - import-images-dry-run
           - import-images
@@ -176,6 +178,10 @@ jobs:
               remote "\$PHP bin/relabel-gallery.php --preview" ;;
             relabel-gallery)
               remote "\$PHP bin/relabel-gallery.php" ;;
+            hide-duplicates-preview)
+              remote "\$PHP bin/hide-duplicates.php --preview" ;;
+            hide-duplicates)
+              remote "\$PHP bin/hide-duplicates.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)
