@@ -731,7 +731,7 @@ final class Site
     private function robots(): void
     {
         header('Content-Type: text/plain; charset=utf-8');
-        echo "User-agent: *\nDisallow: /admin\nDisallow: /enter\nDisallow: /leave\nDisallow: /random\nAllow: /\n\nSitemap: " . site_url('/sitemap.xml') . "\n";
+        echo "User-agent: *\nDisallow: /admin\nDisallow: /enter\nDisallow: /leave\nDisallow: /random\nAllow: /\n\nSitemap: " . (preg_match('/(^|\.)prurientinterests\.me$/i', (string) ($_SERVER['HTTP_HOST'] ?? '')) ? 'https://prurientinterests.me' : site_url()) . "/sitemap.xml\n";
     }
 
     private function sitemap(): void
@@ -753,8 +753,14 @@ final class Site
         foreach ($pdo->query('SELECT slug FROM books WHERE status = "published"') as $bk) {
             $urls[] = [site_url('/books/' . $bk['slug']), null];
         }
+        $seen = [];
         foreach ($pdo->query('SELECT slug, legacy_path, updated_at FROM pages WHERE status = "published"') as $p) {
-            $urls[] = [site_url($p['legacy_path'] ?: '/' . $p['slug']), $p['updated_at']];
+            // About and Contact are listed at their clean addresses; the old Blogger ones redirect there
+            $path = $p['slug'] === 'contact' ? '/contact' : (str_starts_with($p['slug'], 'about') ? '/about' : ($p['legacy_path'] ?: '/' . $p['slug']));
+            if (!isset($seen[$path])) {
+                $seen[$path] = true;
+                $urls[] = [site_url($path), $p['updated_at']];
+            }
         }
         header('Content-Type: application/xml; charset=utf-8');
         echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";

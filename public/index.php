@@ -34,4 +34,18 @@ set_exception_handler(function (Throwable $e): void {
 });
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-(new Site())->handle($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// Safety net for what public/.htaccess already does: www goes to the bare domain, and a trailing slash is dropped,
+// in one 301 hop, for page requests (not form posts, not the admin).
+$host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+$trailing = $path !== '/' && str_ends_with($path, '/') && !str_starts_with($path, '/admin');
+$wwwHop = $host === 'www.prurientinterests.me';
+if (in_array($method, ['GET', 'HEAD'], true) && ($wwwHop || $trailing)) {
+    $clean = $path === '/' ? '/' : rtrim($path, '/');
+    $query = (string) ($_SERVER['QUERY_STRING'] ?? '');
+    $to = ($wwwHop ? 'https://prurientinterests.me' : '') . ($clean === '' ? '/' : $clean) . ($query !== '' ? '?' . $query : '');
+    header('Location: ' . $to, true, 301);
+    return;
+}
+(new Site())->handle($method, $path);
