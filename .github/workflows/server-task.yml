@@ -45,6 +45,8 @@ on:
           - relabel-gallery
           - hide-duplicates-preview
           - hide-duplicates
+          - tag-gallery-features-preview
+          - tag-gallery-features
           - add-amazon-books
           - import-images-dry-run
           - import-images
@@ -182,6 +184,10 @@ jobs:
               remote "\$PHP bin/hide-duplicates.php --preview" ;;
             hide-duplicates)
               remote "\$PHP bin/hide-duplicates.php" ;;
+            tag-gallery-features-preview)
+              remote "\$PHP bin/tag-gallery-features.php --preview" ;;
+            tag-gallery-features)
+              remote "\$PHP bin/tag-gallery-features.php" ;;
             publish-images)
               remote "\$PHP bin/publish-images.php" ;;
             make-series)
