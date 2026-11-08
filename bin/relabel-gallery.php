@@ -45,3 +45,46 @@ foreach (file(Env::root() . '/config/gallery-captions.tsv', FILE_IGNORE_NEW_LINE
 }
 $left = (int) $pdo->query("SELECT COUNT(*) FROM gallery_items WHERE LOWER(caption) LIKE '%dump%' OR LOWER(title) LIKE '%dump%'")->fetchColumn();
 printf("Labels in the file: %d\nPictures %s: %d\nLabels with no matching picture: %d\nPictures still labelled as a Dump: %d\n", $lines, $preview ? 'that would change' : 'changed', $changed, $unmatched, $left);
+
+// Second pass: pictures that still carry a vague post title (config/gallery-vague-captions.txt) get a short description
+// built from their own alt text. Pictures with no alt text are left as they are.
+function shortLabel(string $alt): string
+{
+    $t = rtrim(trim($alt), '.');
+    if (mb_strlen($t) <= 80) {
+        return $t;
+    }
+    $cut = mb_substr($t, 0, 80);
+    foreach ([', ', ' and ', ' with ', ' in ', ' on ', ' by ', ' against '] as $sep) {
+        $p = mb_strrpos($cut, $sep);
+        if ($p !== false && $p >= 30) {
+            return mb_substr($cut, 0, $p);
+        }
+    }
+    return rtrim(mb_substr($cut, 0, (int) mb_strrpos($cut, ' ')), ',; ');
+}
+
+$vagueFile = Env::root() . '/config/gallery-vague-captions.txt';
+$vague = [];
+foreach (is_file($vagueFile) ? file($vagueFile, FILE_IGNORE_NEW_LINES) : [] as $line) {
+    if (trim($line) !== '' && $line[0] !== '#') {
+        $vague[mb_strtolower(trim($line))] = true;
+    }
+}
+$vagueChanged = $vagueSkipped = 0;
+$all = $pdo->query("SELECT id, caption, alt_text FROM gallery_items WHERE alt_text <> ''")->fetchAll();
+foreach ($all as $r) {
+    if (!isset($vague[mb_strtolower(trim((string) $r['caption']))])) {
+        continue;
+    }
+    $label = shortLabel((string) $r['alt_text']);
+    if ($label === '') {
+        $vagueSkipped++;
+        continue;
+    }
+    if (!$preview) {
+        $set->execute([$label, $label, $r['id']]);
+    }
+    $vagueChanged++;
+}
+printf("Vague titles replaced by a description: %s %d\n", $preview ? 'would change' : 'changed', $vagueChanged);
